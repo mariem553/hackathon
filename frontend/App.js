@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════
-   قطوس في شكارة — app.js
+   قطوس في شكارة — App.js
    Axe 2 · Contextual Consistency
    Axe 3 · Source Credibility
 ══════════════════════════════════════════ */
@@ -9,7 +9,54 @@ let mmCurrentTab = "text";
 let mmFile = null;
 let mmFileType = null;
 
-/* ─── Tab switching ─── */
+/* ══════════════════════════════════════════
+   EXAMPLES
+══════════════════════════════════════════ */
+
+const EXAMPLES = {
+  fake: {
+    text: "Catastrophic floods have completely destroyed the city of Paris today. Thousands of people are evacuating as the Eiffel Tower is surrounded by water. French authorities have declared a national emergency.",
+    caption: "Paris underwater — catastrophic floods destroy the city today",
+    url: "https://breaking-news24.net/paris-floods-emergency",
+  },
+  suspicious: {
+    text: "Scientists have discovered that drinking 10 glasses of lemon water every day completely cures cancer in just 2 weeks. Big pharma doesn't want you to know this secret remedy that has been hidden for decades.",
+    caption: "The cancer cure they don't want you to know about",
+    url: "https://healthtruth-secrets.info/cancer-cure-lemon",
+  },
+  verified: {
+    text: "NASA has confirmed that the James Webb Space Telescope has captured the deepest infrared image of the universe ever taken. The image shows thousands of galaxies, some of which formed less than a billion years after the Big Bang.",
+    caption:
+      "NASA releases deepest infrared image of the universe from James Webb Telescope",
+    url: "https://www.nasa.gov/webbtelescope",
+  },
+};
+
+function loadExample(type) {
+  const ex = EXAMPLES[type];
+  if (!ex) return;
+
+  switchTab("text");
+
+  const textArea = document.getElementById("contentText");
+  const caption = document.getElementById("caption");
+  const sourceUrl = document.getElementById("sourceUrl");
+
+  if (textArea) textArea.value = ex.text;
+  if (caption) caption.value = ex.caption;
+  if (sourceUrl) sourceUrl.value = ex.url;
+
+  mmUpdateStatus();
+
+  document
+    .getElementById("analyzeForm")
+    .scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+/* ══════════════════════════════════════════
+   TAB SWITCHING
+══════════════════════════════════════════ */
+
 function switchTab(tab) {
   mmCurrentTab = tab;
 
@@ -50,7 +97,7 @@ if (urlInput) {
   );
 }
 
-/* ─── Drag & drop helpers ─── */
+/* ──── Drag & drop ─── */
 function mmDragOver(e, dropId) {
   e.preventDefault();
   document.getElementById(dropId).classList.add("drag-over");
@@ -124,10 +171,7 @@ function mmRenderPreview(file, type) {
 
   const meta = document.createElement("div");
   meta.className = "preview-meta";
-  meta.innerHTML = `
-    <div class="preview-name">${file.name}</div>
-    <div class="preview-size">${sizeStr}</div>
-  `;
+  meta.innerHTML = `<div class="preview-name">${file.name}</div><div class="preview-size">${sizeStr}</div>`;
 
   strip.innerHTML = "";
   strip.appendChild(thumb);
@@ -137,14 +181,13 @@ function mmRenderPreview(file, type) {
   mmUpdateStatus();
 }
 
-/* ─── Status pill updater ─── */
+/* ─── Status pill ─── */
 function mmUpdateStatus() {
   const pill = document.getElementById("mmStatusPill");
   const label = document.getElementById("mmStatusLabel");
   const count = document.getElementById("mmCharCount");
 
   if (!pill) return;
-
   count.textContent = "";
 
   switch (mmCurrentTab) {
@@ -187,7 +230,7 @@ function mmUpdateStatus() {
   }
 }
 
-/* ─── Collect multimodal content ─── */
+/* ─── Collect content ─── */
 function mmGetContent() {
   switch (mmCurrentTab) {
     case "text":
@@ -205,8 +248,7 @@ function mmGetContent() {
 ══════════════════════════════════════════ */
 
 const SYSTEM_PROMPT_AXE2 = `You are an expert fact-checker and contextual consistency analyst.
-Given a piece of content (text, image, or URL), you analyze whether it is contextually accurate,
-potentially misleading, or verifiably false.
+Given a piece of content (text, image, video frame, or URL), analyze whether it is contextually accurate, potentially misleading, or verifiably false.
 
 Always respond with ONLY a valid JSON object — no preamble, no markdown fences — in exactly this shape:
 {
@@ -218,8 +260,7 @@ Always respond with ONLY a valid JSON object — no preamble, no markdown fences
 
 const SYSTEM_PROMPT_AXE3 = `You are an expert in source credibility analysis.
 Analyze the provided source URL and context for trustworthiness signals.
-Look for: suspicious domain patterns, spoofed legitimate sites, clickbait URLs,
-very new domains, misleading subdomains, writing style inconsistencies.
+Look for: suspicious domain patterns, spoofed legitimate sites, clickbait URLs, very new domains, misleading subdomains, writing style inconsistencies.
 
 Always respond with ONLY a valid JSON object — no preamble, no markdown fences — in exactly this shape:
 {
@@ -250,7 +291,7 @@ function buildPromptAxe2({
     );
   else if (isVideo)
     parts.push(
-      `Analyze this video thumbnail/frame from the file "${videoName}" for contextual consistency.`,
+      `Analyze this video frame from "${videoName}" for contextual consistency and potential misinformation.`,
     );
   else if (url)
     parts.push(
@@ -310,9 +351,9 @@ function setLoading(on) {
 function showResult(data) {
   resultSec.hidden = false;
 
-  /* ── Axe 2 result ── */
+  /* ── Axe 2 ── */
   const dot = document.getElementById("statusDot");
-  const text = document.getElementById("statusText");
+  const statusTx = document.getElementById("statusText");
   const scoreVal = document.getElementById("scoreValue");
   const scoreBar = document.getElementById("scoreBar");
   const expl = document.getElementById("resultExplanation");
@@ -321,16 +362,14 @@ function showResult(data) {
 
   const verdict = (data.verdict || "unknown").toLowerCase();
   const confidence = parseInt(data.confidence ?? 0);
-  const explanation = data.explanation || "—";
-  const flags = Array.isArray(data.flags) ? data.flags : [];
 
   dot.className = "status-dot " + verdict;
-  text.textContent = verdict.charAt(0).toUpperCase() + verdict.slice(1);
+  statusTx.textContent = verdict.charAt(0).toUpperCase() + verdict.slice(1);
   scoreVal.textContent = confidence + "%";
-  expl.textContent = explanation;
+  expl.textContent = data.explanation || "—";
 
   flagsEl.innerHTML = "";
-  flags.forEach((f) => {
+  (Array.isArray(data.flags) ? data.flags : []).forEach((f) => {
     const span = document.createElement("span");
     span.className = "flag-tag";
     span.textContent = f;
@@ -341,22 +380,22 @@ function showResult(data) {
     scoreBar.style.width = confidence + "%";
   }, 50);
 
-  /* ── Axe 3 result ── */
-  const sourceSection = document.getElementById("sourceResult");
-  if (sourceSection && data.source_verdict) {
-    sourceSection.hidden = false;
+  /* ── Axe 3 ── */
+  const sourceCard = document.getElementById("sourceResult");
+  if (sourceCard && data.source_verdict) {
+    sourceCard.hidden = false;
 
+    const sourceDot = document.getElementById("sourceDot");
     const sv = document.getElementById("sourceVerdict");
     const ss = document.getElementById("sourceScore");
     const se = document.getElementById("sourceExplanation");
     const sf = document.getElementById("sourceFlags");
     const sb = document.getElementById("sourceBar");
 
-    sv.textContent =
-      data.source_verdict.charAt(0).toUpperCase() +
-      data.source_verdict.slice(1);
-    sv.className = "source-badge " + data.source_verdict;
-    ss.textContent = data.source_score + "%";
+    const sVerdict = (data.source_verdict || "unknown").toLowerCase();
+    sourceDot.className = "status-dot " + sVerdict;
+    sv.textContent = sVerdict.charAt(0).toUpperCase() + sVerdict.slice(1);
+    ss.textContent = (data.source_score ?? 0) + "%";
     se.textContent = data.source_explanation || "—";
 
     if (sf) {
@@ -369,17 +408,18 @@ function showResult(data) {
       });
     }
 
-    if (sb) {
+    if (sb)
       setTimeout(() => {
-        sb.style.width = data.source_score + "%";
+        sb.style.width = (data.source_score ?? 0) + "%";
       }, 50);
-    }
   }
 
   rawEl.textContent = JSON.stringify(data, null, 2);
+
+  resultSec.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-/* raw-toggle */
+/* raw toggle */
 document.getElementById("rawToggle")?.addEventListener("click", () => {
   const raw = document.getElementById("resultRaw");
   const arrow = document.querySelector(".toggle-arrow");
@@ -399,7 +439,7 @@ form?.addEventListener("submit", async (e) => {
   const caption = document.getElementById("caption")?.value.trim() || "";
   const sourceUrl = document.getElementById("sourceUrl")?.value.trim() || "";
 
-  /* basic validation */
+  /* validation */
   if (content.type === "text" && !content.value) {
     clog("[error] No text content provided.");
     return;
@@ -417,7 +457,7 @@ form?.addEventListener("submit", async (e) => {
   clog("[info] Building request…");
 
   try {
-    /* ── Build Axe 2 user content ── */
+    /* ── Build Axe 2 content ── */
     let userContentAxe2 = [];
 
     if (content.type === "text") {
@@ -435,10 +475,13 @@ form?.addEventListener("submit", async (e) => {
     } else if (content.type === "image") {
       clog("[info] Mode: image → " + content.file.name);
       const b64 = await fileToBase64(content.file);
-      const mediaType = content.file.type || "image/jpeg";
       userContentAxe2.push({
         type: "image",
-        source: { type: "base64", media_type: mediaType, data: b64 },
+        source: {
+          type: "base64",
+          media_type: content.file.type || "image/jpeg",
+          data: b64,
+        },
       });
       userContentAxe2.push({
         type: "text",
@@ -451,7 +494,11 @@ form?.addEventListener("submit", async (e) => {
       const frameB64 = await videoFrame(content.file);
       userContentAxe2.push({
         type: "image",
-        source: { type: "base64", media_type: "image/jpeg", data: frameB64 },
+        source: {
+          type: "base64",
+          media_type: content.file.type || "image/jpeg",
+          data: b64, // ← juste le base64 pur, sans le préfixe "data:..."
+        },
       });
       userContentAxe2.push({
         type: "text",
@@ -468,7 +515,6 @@ form?.addEventListener("submit", async (e) => {
 
     /* ── Two API calls at the same time ── */
     const [response2, response3] = await Promise.all([
-      /* Axe 2 — Contextual Consistency — goes through your secure server */
       fetch("http://localhost:3000/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -478,17 +524,13 @@ form?.addEventListener("submit", async (e) => {
         }),
       }),
 
-      /* Axe 3 — Source Credibility — goes through your secure server */
       fetch("http://localhost:3000/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           systemPrompt: SYSTEM_PROMPT_AXE3,
           userContent: [
-            {
-              type: "text",
-              text: buildPromptAxe3({ sourceUrl, caption }),
-            },
+            { type: "text", text: buildPromptAxe3({ sourceUrl, caption }) },
           ],
         }),
       }),
@@ -505,20 +547,20 @@ form?.addEventListener("submit", async (e) => {
       return;
     }
 
-    /* ── Parse both responses ── */
+    /* ── Parse responses ── */
     const data2 = await response2.json();
     const data3 = await response3.json();
 
-    const raw2 = data2.result || "{}";
-    const raw3 = data3.result || "{}";
+    const raw2 = (data2.result || "{}").replace(/```json|```/gi, "").trim();
+    const raw3 = (data3.result || "{}").replace(/```json|```/gi, "").trim();
 
     clog("[axe2 raw] " + raw2);
     clog("[axe3 raw] " + raw3);
 
-    const result2 = JSON.parse(raw2.replace(/```json|```/gi, "").trim());
-    const result3 = JSON.parse(raw3.replace(/```json|```/gi, "").trim());
+    const result2 = JSON.parse(raw2);
+    const result3 = JSON.parse(raw3);
 
-    /* ── Combine scores: Axe2 = 60%, Axe3 = 40% ── */
+    /* ── Combined score: Axe2 = 60%, Axe3 = 40% ── */
     const combinedScore = Math.round(
       result2.confidence * 0.6 + result3.source_score * 0.4,
     );
@@ -527,8 +569,7 @@ form?.addEventListener("submit", async (e) => {
     clog("[info] Axe3 score: " + result3.source_score + "%");
     clog("[info] Combined score: " + combinedScore + "%");
 
-    /* ── Merge and display ── */
-    const merged = {
+    showResult({
       verdict: result2.verdict,
       confidence: combinedScore,
       explanation: result2.explanation,
@@ -537,9 +578,7 @@ form?.addEventListener("submit", async (e) => {
       source_score: result3.source_score,
       source_explanation: result3.source_explanation,
       source_flags: result3.source_flags,
-    };
-
-    showResult(merged);
+    });
   } catch (err) {
     clog("[error] " + err.message);
   } finally {
