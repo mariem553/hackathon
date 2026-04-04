@@ -40,14 +40,14 @@
         <span class="logo-latin">AI VERIFICATION</span>
       </div>
     </a>
-    <div class="header-tag">Contextual Consistency · Source Credibility</div>
+    <div class="header-tag">Authenticity · Consistency · Credibility</div>
   </header>
 
   <main>
     <section class="hero">
-      <p class="hero-label">[ AI-powered verification ]</p>
+      <p class="hero-label">[ AI-powered verification · 3 axes ]</p>
       <h1 class="hero-title">Is this content<br><em>telling the truth?</em></h1>
-      <p class="hero-sub">Paste text, drop an image, a video, or a URL.<br>We analyze contextual consistency and source credibility in seconds.</p>
+      <p class="hero-sub">Paste text, drop an image, a video, or a URL.<br>We run 3 AI axes in parallel — authenticity, consistency, and source credibility.</p>
     </section>
 
     <!-- EXAMPLES -->
@@ -72,98 +72,53 @@
 
           <div class="tab-bar" role="tablist">
             <button type="button" class="tab-btn active" data-tab="text" role="tab" aria-selected="true" onclick="switchTab('text')">
-              <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4">
-                <rect x="1" y="2" width="12" height="10" rx="1.5"/>
-                <line x1="3.5" y1="5" x2="10.5" y2="5"/>
-                <line x1="3.5" y1="7.5" x2="8" y2="7.5"/>
-                <line x1="3.5" y1="10" x2="6" y2="10"/>
-              </svg>
+              <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1" y="2" width="12" height="10" rx="1.5"/><line x1="3.5" y1="5" x2="10.5" y2="5"/><line x1="3.5" y1="7.5" x2="8" y2="7.5"/><line x1="3.5" y1="10" x2="6" y2="10"/></svg>
               Text
             </button>
             <button type="button" class="tab-btn" data-tab="image" role="tab" aria-selected="false" onclick="switchTab('image')">
-              <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4">
-                <rect x="1" y="2" width="12" height="10" rx="1.5"/>
-                <circle cx="4.5" cy="5.5" r="1"/>
-                <path d="M1 9.5 L4 7 L7 9.5 L10 7 L13 9.5"/>
-              </svg>
+              <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1" y="2" width="12" height="10" rx="1.5"/><circle cx="4.5" cy="5.5" r="1"/><path d="M1 9.5 L4 7 L7 9.5 L10 7 L13 9.5"/></svg>
               Image
             </button>
             <button type="button" class="tab-btn" data-tab="video" role="tab" aria-selected="false" onclick="switchTab('video')">
-              <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4">
-                <rect x="1" y="3" width="9" height="8" rx="1.5"/>
-                <path d="M10 5.5 L13 4 L13 10 L10 8.5 Z"/>
-              </svg>
+              <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1" y="3" width="9" height="8" rx="1.5"/><path d="M10 5.5 L13 4 L13 10 L10 8.5 Z"/></svg>
               Video
             </button>
             <button type="button" class="tab-btn" data-tab="url" role="tab" aria-selected="false" onclick="switchTab('url')">
-              <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4">
-                <path d="M6 7a3 3 0 0 0 4.24 0l1.5-1.5a3 3 0 0 0-4.24-4.24L6 2.75"/>
-                <path d="M8 7a3 3 0 0 0-4.24 0L2.26 8.5A3 3 0 0 0 6.5 12.74L9 11.25"/>
-              </svg>
+              <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M6 7a3 3 0 0 0 4.24 0l1.5-1.5a3 3 0 0 0-4.24-4.24L6 2.75"/><path d="M8 7a3 3 0 0 0-4.24 0L2.26 8.5A3 3 0 0 0 6.5 12.74L9 11.25"/></svg>
               URL
             </button>
           </div>
 
           <div class="input-zone" id="inputZone">
 
-            <!-- Pane: text -->
             <div class="mm-pane active" id="pane-text" role="tabpanel">
-              <textarea id="contentText" name="content_text" rows="5"
-                placeholder="Paste the article text, post, caption, or description here…"></textarea>
+              <textarea id="contentText" name="content_text" rows="5" placeholder="Paste the article text, post, caption, or description here…"></textarea>
             </div>
 
-            <!-- Pane: image -->
             <div class="mm-pane" id="pane-image" role="tabpanel">
-              <div class="drop-zone" id="dropImage"
-                ondragover="mmDragOver(event,'dropImage')"
-                ondragleave="mmDragLeave('dropImage')"
-                ondrop="mmDropFile(event,'image')">
-                <input type="file" accept="image/*" id="imgInput" name="content_image"
-                  onchange="mmFileChosen(event,'image')">
-                <div class="drop-icon">
-                  <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.4">
-                    <rect x="2" y="3" width="18" height="16" rx="2.5"/>
-                    <circle cx="7" cy="8" r="1.8"/>
-                    <path d="M2 15 L6.5 11 L10.5 15 L15 11 L20 15"/>
-                  </svg>
-                </div>
+              <div class="drop-zone" id="dropImage" ondragover="mmDragOver(event,'dropImage')" ondragleave="mmDragLeave('dropImage')" ondrop="mmDropFile(event,'image')">
+                <input type="file" accept="image/*" id="imgInput" name="content_image" onchange="mmFileChosen(event,'image')">
+                <div class="drop-icon"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="3" width="18" height="16" rx="2.5"/><circle cx="7" cy="8" r="1.8"/><path d="M2 15 L6.5 11 L10.5 15 L15 11 L20 15"/></svg></div>
                 <div class="drop-label"><strong>Click to upload</strong> or drag &amp; drop an image</div>
                 <div class="drop-hint">PNG · JPG · WEBP · GIF — max 20 MB</div>
               </div>
               <div class="preview-strip" id="previewImage"></div>
             </div>
 
-            <!-- Pane: video -->
             <div class="mm-pane" id="pane-video" role="tabpanel">
-              <div class="drop-zone" id="dropVideo"
-                ondragover="mmDragOver(event,'dropVideo')"
-                ondragleave="mmDragLeave('dropVideo')"
-                ondrop="mmDropFile(event,'video')">
-                <input type="file" accept="video/*" id="vidInput" name="content_video"
-                  onchange="mmFileChosen(event,'video')">
-                <div class="drop-icon">
-                  <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.4">
-                    <rect x="2" y="4" width="13" height="14" rx="2.5"/>
-                    <path d="M15 8.5 L20 6 L20 16 L15 13.5 Z"/>
-                  </svg>
-                </div>
+              <div class="drop-zone" id="dropVideo" ondragover="mmDragOver(event,'dropVideo')" ondragleave="mmDragLeave('dropVideo')" ondrop="mmDropFile(event,'video')">
+                <input type="file" accept="video/*" id="vidInput" name="content_video" onchange="mmFileChosen(event,'video')">
+                <div class="drop-icon"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="4" width="13" height="14" rx="2.5"/><path d="M15 8.5 L20 6 L20 16 L15 13.5 Z"/></svg></div>
                 <div class="drop-label"><strong>Click to upload</strong> or drag &amp; drop a video</div>
                 <div class="drop-hint">MP4 · MOV · WEBM — max 50 MB</div>
               </div>
               <div class="preview-strip" id="previewVideo"></div>
             </div>
 
-            <!-- Pane: URL -->
             <div class="mm-pane" id="pane-url" role="tabpanel">
               <div class="url-pane">
-                <span class="url-icon">
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
-                    <path d="M7 8a3.5 3.5 0 0 0 4.95 0l1.75-1.75A3.5 3.5 0 0 0 8.75 1.3L7 3.05"/>
-                    <path d="M9 8a3.5 3.5 0 0 0-4.95 0L2.3 9.75A3.5 3.5 0 0 0 7.25 14.7L9 12.95"/>
-                  </svg>
-                </span>
-                <input type="url" id="contentUrl" name="content_url"
-                  placeholder="https://example.com/article-to-verify…">
+                <span class="url-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M7 8a3.5 3.5 0 0 0 4.95 0l1.75-1.75A3.5 3.5 0 0 0 8.75 1.3L7 3.05"/><path d="M9 8a3.5 3.5 0 0 0-4.95 0L2.3 9.75A3.5 3.5 0 0 0 7.25 14.7L9 12.95"/></svg></span>
+                <input type="url" id="contentUrl" name="content_url" placeholder="https://example.com/article-to-verify…">
               </div>
             </div>
 
@@ -174,26 +129,16 @@
               </div>
               <span id="mmCharCount"></span>
             </div>
-
           </div>
         </div>
 
-        <!-- FIELDS 02 & 03 -->
         <div class="field-row">
           <div class="field">
-            <label for="caption">
-              <span class="field-num">02</span>
-              Title or caption
-            </label>
+            <label for="caption"><span class="field-num">02</span> Title or caption</label>
             <input type="text" id="caption" name="caption" placeholder="The headline or caption being claimed…" />
           </div>
-
           <div class="field">
-            <label for="sourceUrl">
-              <span class="field-num">03</span>
-              Source URL
-              <span class="optional">optional</span>
-            </label>
+            <label for="sourceUrl"><span class="field-num">03</span> Source URL <span class="optional">optional</span></label>
             <input type="url" id="sourceUrl" name="url" placeholder="https://example.com/article" />
           </div>
         </div>
@@ -201,18 +146,42 @@
         <button type="submit" id="submitBtn">
           <span class="btn-text">Analyze content</span>
           <span class="btn-arrow">→</span>
-          <span class="btn-loader" hidden>
-            <span></span><span></span><span></span>
-          </span>
+          <span class="btn-loader" hidden><span></span><span></span><span></span></span>
         </button>
 
       </form>
     </section>
 
-    <!-- AXE 2 RESULT -->
+    <!-- GLOBAL VERDICT BANNER -->
+    <div class="global-verdict" id="globalVerdict" hidden>
+      <span id="globalIcon"></span>
+      <span id="globalText"></span>
+      <span id="globalScore"></span>
+    </div>
+
+    <!-- RESULTS -->
     <section class="result-section" id="resultSection" hidden>
 
-      <div class="result-label">Contextual consistency — Axe 2</div>
+      <!-- AXE 1 — Content Authenticity -->
+      <div class="result-label">Content authenticity — Axe 1</div>
+      <div class="result-card" id="axe1Result" hidden>
+        <div class="result-header">
+          <div class="result-status">
+            <span class="status-dot" id="axe1Dot"></span>
+            <span id="axe1Verdict">—</span>
+          </div>
+          <div class="result-score">
+            <span class="score-label">authenticity score</span>
+            <span class="score-value" id="axe1Score">—</span>
+          </div>
+        </div>
+        <div class="score-bar-wrap"><div class="score-bar" id="axe1Bar"></div></div>
+        <div class="result-explanation" id="axe1Explanation">—</div>
+        <div class="result-flags" id="axe1Flags"></div>
+      </div>
+
+      <!-- AXE 2 — Contextual Consistency -->
+      <div class="result-label" style="margin-top:24px;">Contextual consistency — Axe 2</div>
       <div class="result-card" id="resultCard">
         <div class="result-header">
           <div class="result-status" id="resultStatus">
@@ -224,9 +193,7 @@
             <span class="score-value" id="scoreValue">—</span>
           </div>
         </div>
-        <div class="score-bar-wrap">
-          <div class="score-bar" id="scoreBar"></div>
-        </div>
+        <div class="score-bar-wrap"><div class="score-bar" id="scoreBar"></div></div>
         <div class="result-explanation" id="resultExplanation">—</div>
         <div class="result-flags" id="resultFlags"></div>
         <div class="result-raw-toggle" id="rawToggle">
@@ -236,8 +203,8 @@
         <pre class="result-raw" id="resultRaw" hidden></pre>
       </div>
 
-      <!-- AXE 3 RESULT -->
-      <div class="result-label" style="margin-top: 24px;">Source credibility — Axe 3</div>
+      <!-- AXE 3 — Source Credibility -->
+      <div class="result-label" style="margin-top:24px;">Source credibility — Axe 3</div>
       <div class="result-card" id="sourceResult" hidden>
         <div class="result-header">
           <div class="result-status">
@@ -249,14 +216,17 @@
             <span class="score-value" id="sourceScore">—</span>
           </div>
         </div>
-        <div class="score-bar-wrap">
-          <div class="score-bar" id="sourceBar"></div>
-        </div>
+        <div class="score-bar-wrap"><div class="score-bar" id="sourceBar"></div></div>
         <div class="result-explanation" id="sourceExplanation">—</div>
         <div class="result-flags" id="sourceFlags"></div>
       </div>
 
     </section>
+
+    <!-- RESET BUTTON -->
+    <button type="button" id="analyzeAnotherBtn" class="reset-btn" hidden onclick="resetAll()">
+      ← Analyze another content
+    </button>
 
     <!-- CONSOLE -->
     <section class="console-section" id="consoleSection" hidden>
@@ -280,7 +250,7 @@
       </svg>
       قطوس في شكارة · Hackathon 2026
     </span>
-    <span>Axe 2 + Axe 3 — AI Verification</span>
+    <span>Axe 1 · Axe 2 · Axe 3 — AI Verification</span>
   </footer>
 
   <script src="App.js"></script>
