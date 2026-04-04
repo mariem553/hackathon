@@ -483,6 +483,15 @@ form?.addEventListener("submit", async (e) => {
           data: b64,
         },
       });
+    } else if (content.type === "video") {
+      clog(
+        "[info] Mode: video → " + content.file.name + " (extracting frame…)",
+      );
+      const b64 = await videoFrame(content.file); // ← frameB64 → b64
+      userContentAxe2.push({
+        type: "image",
+        source: { type: "base64", media_type: "image/jpeg", data: b64 },
+      });
       userContentAxe2.push({
         type: "text",
         text: buildPromptAxe2({ caption, sourceUrl, isImage: true }),
