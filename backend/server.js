@@ -12,33 +12,60 @@ app.use(express.json({ limit: "20mb" }));
 app.use(express.static("../frontend"));
 
 /* ══════════════════════════════════════════
-   POST /analyze — Groq AI call
-   Supports text + image (base64)
+   POST /analyze — Groq AI
    Auto-selects vision model if image present
 ══════════════════════════════════════════ */
 app.post("/analyze", async (req, res) => {
-  const { systemPrompt, userContent } = req.body;
+  const { systemPrompt, userContent, prompt } = req.body;
+
+  // Backwards compatibility
+  if (prompt && !userContent) {
+    try {
+      const msgs = [];
+      if (systemPrompt) msgs.push({ role: "system", content: systemPrompt });
+      msgs.push({ role: "user", content: prompt });
+      const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: "llama-3.3-70b-versatile",
+          messages: msgs,
+          temperature: 0.2,
+          max_tokens: 1000,
+        }),
+      });
+      if (!r.ok) {
+        const e = await r.text();
+        return res.status(502).json({ error: "Groq error", details: e });
+      }
+      const d = await r.json();
+      return res.json({ result: d.choices?.[0]?.message?.content || "{}" });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
 
   if (!userContent || !Array.isArray(userContent)) {
     return res.status(400).json({ error: "No userContent provided" });
   }
 
   const hasImage = userContent.some((b) => b.type === "image");
-
   const model = hasImage
     ? "meta-llama/llama-4-scout-17b-16e-instruct"
     : "llama-3.3-70b-versatile";
 
   const userParts = userContent
     .map((block) => {
-      if (block.type === "text") {
-        return { type: "text", text: block.text };
-      }
-      if (block.type === "image") {
-        const dataUri = `data:${block.source.media_type};base64,${block.source.data}`;
+      if (block.type === "text") return { type: "text", text: block.text };
+      if (block.type === "image" && block.source?.data) {
         return {
           type: "image_url",
-          image_url: { url: dataUri },
+          image_url: {
+            url: `data:${block.source.media_type};base64,${block.source.data}`,
+          },
         };
       }
       return null;
@@ -46,9 +73,7 @@ app.post("/analyze", async (req, res) => {
     .filter(Boolean);
 
   const messages = [];
-  if (systemPrompt) {
-    messages.push({ role: "system", content: systemPrompt });
-  }
+  if (systemPrompt) messages.push({ role: "system", content: systemPrompt });
   messages.push({ role: "user", content: userParts });
 
   try {
@@ -88,9 +113,8 @@ app.post("/analyze", async (req, res) => {
 });
 
 /* ══════════════════════════════════════════
-   POST /fetch-url — Real URL scraping
-   Fetches HTML, extracts clean text via cheerio
-   Used for real URL content analysis (not just domain)
+   POST /fetch-url — URL scraping with metadata
+   Returns title, description, images, body text
 ══════════════════════════════════════════ */
 app.post("/fetch-url", async (req, res) => {
   const { url } = req.body;
@@ -105,26 +129,36 @@ app.post("/fetch-url", async (req, res) => {
       signal: AbortSignal.timeout(8000),
     });
 
-    if (!response.ok) {
-      return res.status(502).json({
-        error: "Could not fetch URL",
-        status: response.status,
-      });
-    }
+    if (!response.ok)
+      return res
+        .status(502)
+        .json({ error: "Could not fetch URL", status: response.status });
 
     const html = await response.text();
     const $ = cheerio.load(html);
 
-    // Remove noise elements
-    $("script, style, nav, footer, iframe, noscript, ads, .ad, #ad").remove();
+    $("script, style, nav, footer, iframe, noscript, .ad, #ad").remove();
 
     const title = $("title").text().trim();
     const description = $('meta[name="description"]').attr("content") || "";
     const ogTitle = $('meta[property="og:title"]').attr("content") || "";
     const ogDesc = $('meta[property="og:description"]').attr("content") || "";
     const ogImage = $('meta[property="og:image"]').attr("content") || "";
+    const twitterTitle = $('meta[name="twitter:title"]').attr("content") || "";
+    const twitterImage = $('meta[name="twitter:image"]').attr("content") || "";
 
-    // Extract clean body text (max 3000 chars for token efficiency)
+    // Extract main images from the page
+    const images = [];
+    $("img").each((i, el) => {
+      const src = $(el).attr("src");
+      if (src && src.match(/\.(jpg|jpeg|png|webp)/i) && i < 3) {
+        const absoluteSrc = src.startsWith("http")
+          ? src
+          : new URL(src, url).href;
+        images.push(absoluteSrc);
+      }
+    });
+
     const bodyText = $("body")
       .text()
       .replace(/\s+/g, " ")
@@ -132,13 +166,11 @@ app.post("/fetch-url", async (req, res) => {
       .slice(0, 3000);
 
     console.log("[fetch-url ok]", url, "| chars:", bodyText.length);
-
     res.json({
-      title,
-      description,
-      ogTitle,
-      ogDesc,
-      ogImage,
+      title: title || ogTitle || twitterTitle,
+      description: description || ogDesc,
+      image: ogImage || twitterImage || images[0] || "",
+      images,
       bodyText,
       finalUrl: response.url,
     });
