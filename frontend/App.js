@@ -1,9 +1,15 @@
 /* ══════════════════════════════════════════
-   قطوس في شكارة — App.js
-   ✅ 5-step pipeline with progress indicator
-   ✅ ML pre-score (TF-IDF) + LLM hybrid
-   ✅ ML×40% + LLM×60% weighted per axis
-   ✅ Full multimodal: text + image(s) + video + URL + caption
+   قطوس في شكارة — App.js (Chatbot)
+   ✅ FULLY EXPLAINABLE AI:
+   - ELA heatmap shown for images
+   - RAG similar cases shown to user
+   - ML top trigger words highlighted
+   - CoT reasoning steps displayed
+   - Score breakdown per axis visible
+   ✅ 5-step pipeline with progress
+   ✅ ML×40% + LLM×60% per axis
+   ✅ Axe1×20% + Axe2×50% + Axe3×30%
+   ✅ Dialecte tunisien
 ══════════════════════════════════════════ */
 
 /* ─── State ─── */
@@ -14,8 +20,7 @@ let captionInputVisible = false;
 /* ══════════════════════════════════════════
    BOT AVATAR SVG
 ══════════════════════════════════════════ */
-const BOT_AVATAR_SVG = `
-<svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+const BOT_AVATAR_SVG = `<svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
   <path d="M8 17 Q8 13 12 13 L28 13 Q32 13 32 17 L30 34 Q30 36 28 36 L12 36 Q10 36 10 34 Z" fill="#1a1a28" stroke="#d4a8ff" stroke-width="1.2"/>
   <path d="M14 13 Q20 9 26 13" stroke="#d4a8ff" stroke-width="1.2" stroke-linecap="round" fill="none"/>
   <ellipse cx="20" cy="13" rx="6" ry="5" fill="#d4a8ff"/>
@@ -31,6 +36,9 @@ const BOT_AVATAR_SVG = `
   <path d="M13 23 Q11 22 12 20 Q14 19 15 21 Q16 19 18 20 Q18 22 16 23 Z" fill="#d4a8ff" opacity="0.7"/>
 </svg>`;
 
+/* ══════════════════════════════════════════
+   SUGGESTIONS
+══════════════════════════════════════════ */
 const SUGGESTIONS = {
   fake: "Is it true that massive floods destroyed Paris today? https://breaking-news24.net/paris-floods-emergency",
   suspicious:
@@ -38,6 +46,7 @@ const SUGGESTIONS = {
   verified:
     "NASA released the deepest infrared image of the universe from the James Webb Space Telescope. https://www.nasa.gov/webbtelescope",
 };
+
 function loadSuggestion(type) {
   const input = document.getElementById("chatInput");
   input.value = SUGGESTIONS[type];
@@ -46,7 +55,7 @@ function loadSuggestion(type) {
 }
 
 /* ══════════════════════════════════════════
-   TOGGLE EXTRA INPUT ROWS
+   EXTRA INPUT TOGGLES
 ══════════════════════════════════════════ */
 function toggleUrlInput() {
   urlInputVisible = !urlInputVisible;
@@ -111,8 +120,7 @@ function renderAttachedItems() {
       }
       <span class="attached-name">${item.file.name.length > 18 ? item.file.name.slice(0, 16) + "…" : item.file.name}</span>
       <button class="attached-remove" onclick="removeAttachedItem(${i})">×</button>
-    </div>
-  `,
+    </div>`,
     )
     .join("");
 }
@@ -121,8 +129,8 @@ function clearFile() {
   pendingFiles.forEach((p) => URL.revokeObjectURL(p.previewUrl));
   pendingFiles = [];
   renderAttachedItems();
-  const fileInput = document.getElementById("fileInput");
-  if (fileInput) fileInput.value = "";
+  const fi = document.getElementById("fileInput");
+  if (fi) fi.value = "";
 }
 
 /* ══════════════════════════════════════════
@@ -146,7 +154,7 @@ function detectLang(text) {
   if (!text || text.trim().length < 3) return "English";
   if (/[\u0600-\u06FF]/.test(text)) return "Arabic";
   if (
-    /\b(le|la|les|un|une|des|est|sont|que|qui|pour|dans|avec|sur|pas|plus|très|aussi|mais|zaama|wella|mish)\b/i.test(
+    /\b(le|la|les|un|une|des|est|sont|que|qui|pour|dans|avec|sur|pas|plus|très|aussi|mais|zaama|wella|mish|sahha)\b/i.test(
       text,
     )
   )
@@ -155,14 +163,14 @@ function detectLang(text) {
 }
 
 /* ══════════════════════════════════════════
-   PROGRESS INDICATOR
+   PROGRESS STEPS
 ══════════════════════════════════════════ */
 const STEPS = [
-  "[1/5] Extracting content signals…",
-  "[2/5] Fetching URL content…",
-  "[3/5] Running ML pre-score (TF-IDF)…",
-  "[4/5] Running 3-axis AI analysis…",
-  "[5/5] Computing combined score…",
+  "[1/5] Extraction des signaux…",
+  "[2/5] Fetch URL content…",
+  "[3/5] ML pre-score TF-IDF…",
+  "[4/5] RAG similarity search…",
+  "[5/5] 3-axis AI analysis…",
 ];
 
 function updateTypingStep(stepIndex) {
@@ -171,7 +179,194 @@ function updateTypingStep(stepIndex) {
 }
 
 /* ══════════════════════════════════════════
-   CHAT UI HELPERS
+   EXPLAINABILITY HELPERS
+══════════════════════════════════════════ */
+
+/* Highlight clickbait words in text */
+const CLICKBAIT_WORDS = [
+  "shocking",
+  "exposed",
+  "secret",
+  "conspiracy",
+  "doctors don't want",
+  "you won't believe",
+  "mainstream media",
+  "doctors hate",
+  "government hiding",
+  "share before",
+  "deleted",
+  "suppressed",
+  "banned",
+  "miracle",
+  "cure",
+  "urgent",
+  "breaking",
+  "exclusive",
+  "truth revealed",
+  "wake up",
+  "deep state",
+  "new world order",
+  "elite",
+  "cabal",
+  "zaama",
+  "urgent",
+];
+
+function highlightSuspiciousWords(text) {
+  if (!text) return "";
+  let result = escapeHtml(text);
+  CLICKBAIT_WORDS.forEach((word) => {
+    const regex = new RegExp(`(${word})`, "gi");
+    result = result.replace(regex, `<mark class="suspicious-word">$1</mark>`);
+  });
+  return result;
+}
+
+/* Build RAG cases HTML */
+function buildRagHtml(ragData) {
+  if (!ragData || !ragData.similarCases || ragData.similarCases.length === 0)
+    return "";
+
+  const icons = { verified: "✅", suspicious: "⚠️", misleading: "🔴" };
+  const cases = ragData.similarCases
+    .map(
+      (c) => `
+    <div class="rag-item rag-${c.verdict}">
+      <div class="rag-item-header">
+        <span class="rag-icon">${icons[c.verdict] || "❓"}</span>
+        <span class="rag-caption">${escapeHtml(c.caption || c.content.slice(0, 80))}</span>
+        <span class="rag-sim">${Math.round(c.similarity * 100)}% sim</span>
+      </div>
+      <p class="rag-expl">${escapeHtml(c.explanation || "")}</p>
+    </div>`,
+    )
+    .join("");
+
+  const gapScore = ragData.contextualGapScore || 0;
+  const gapColor =
+    gapScore > 75
+      ? "var(--misleading)"
+      : gapScore > 50
+        ? "var(--suspicious)"
+        : "var(--verified)";
+
+  return `
+    <div class="rag-block">
+      <div class="rag-header">
+        <span class="rag-title">🔍 RAG — ${ragData.numSimilarCases} cas similaires trouvés</span>
+        <span class="rag-gap" style="color:${gapColor}">Gap caption/contenu: ${gapScore}%</span>
+      </div>
+      ${cases}
+    </div>`;
+}
+
+/* Build ML explanation HTML */
+function buildMlHtml(mlPredict, mlFeatures) {
+  if (!mlPredict && !mlFeatures) return "";
+
+  let html = `<div class="ml-explain-block">
+    <div class="axe-mini-header"><span class="axe-label">🤖 ML Explainability (TF-IDF)</span></div>`;
+
+  if (mlPredict) {
+    const fakeP = Math.round(mlPredict.fake_probability * 100);
+    const realP = Math.round(mlPredict.real_probability * 100);
+    const barColor =
+      fakeP > 65
+        ? "var(--misleading)"
+        : fakeP > 45
+          ? "var(--suspicious)"
+          : "var(--verified)";
+
+    html += `
+      <div class="ml-prob-row">
+        <span class="ml-prob-label">Fake probability</span>
+        <div class="ml-prob-bar-wrap"><div class="ml-prob-bar" style="width:${fakeP}%;background:${barColor}"></div></div>
+        <span class="ml-prob-val" style="color:${barColor}">${fakeP}%</span>
+      </div>
+      <div class="ml-prob-row">
+        <span class="ml-prob-label">Real probability</span>
+        <div class="ml-prob-bar-wrap"><div class="ml-prob-bar" style="width:${realP}%;background:var(--verified)"></div></div>
+        <span class="ml-prob-val" style="color:var(--verified)">${realP}%</span>
+      </div>`;
+
+    if (mlPredict.flags && mlPredict.flags.length > 0) {
+      html += `<div class="ml-flags-row">${mlPredict.flags.map((f) => `<span class="flag-tag">${f}</span>`).join("")}</div>`;
+    }
+  }
+
+  if (mlFeatures) {
+    const srcColor =
+      mlFeatures.source_verdict === "trusted"
+        ? "var(--verified)"
+        : "var(--misleading)";
+    html += `
+      <div class="ml-prob-row" style="margin-top:6px">
+        <span class="ml-prob-label">Source score</span>
+        <div class="ml-prob-bar-wrap"><div class="ml-prob-bar" style="width:${mlFeatures.source_score}%;background:${srcColor}"></div></div>
+        <span class="ml-prob-val" style="color:${srcColor}">${mlFeatures.source_score}%</span>
+      </div>`;
+    if (mlFeatures.combined_flags && mlFeatures.combined_flags.length > 0) {
+      html += `<div class="ml-flags-row">${mlFeatures.combined_flags.map((f) => `<span class="flag-tag">${f}</span>`).join("")}</div>`;
+    }
+  }
+
+  html += `</div>`;
+  return html;
+}
+
+/* Build score breakdown HTML */
+function buildScoreBreakdown(axe1, axe2, axe3, combined) {
+  const axes = [
+    { label: "Axe 1 · Authenticité (×20%)", score: axe1, weight: 20 },
+    { label: "Axe 2 · Consistance (×50%)", score: axe2, weight: 50 },
+    { label: "Axe 3 · Crédibilité (×30%)", score: axe3, weight: 30 },
+  ];
+
+  const rows = axes
+    .map((a) => {
+      const color =
+        a.score >= 70
+          ? "var(--verified)"
+          : a.score >= 40
+            ? "var(--suspicious)"
+            : "var(--misleading)";
+      return `<div class="breakdown-row">
+      <span class="breakdown-label">${a.label}</span>
+      <div class="breakdown-bar-wrap"><div class="breakdown-bar" style="width:${a.score}%;background:${color}"></div></div>
+      <span class="breakdown-val">${a.score}%</span>
+    </div>`;
+    })
+    .join("");
+
+  return `<div class="score-breakdown">
+    ${rows}
+    <div class="breakdown-formula">Score combiné = ${axe1}×0.2 + ${axe2}×0.5 + ${axe3}×0.3 = <strong style="color:var(--accent)">${combined}%</strong></div>
+  </div>`;
+}
+
+/* Build ELA heatmap HTML */
+function buildElaHtml(elaData) {
+  if (!elaData || !elaData.heatmap_base64) return "";
+  const color =
+    elaData.ela_score > 60
+      ? "var(--misleading)"
+      : elaData.ela_score > 40
+        ? "var(--suspicious)"
+        : "var(--verified)";
+  return `
+    <div class="ela-block">
+      <div class="axe-mini-header">
+        <span class="axe-label">🔬 ELA — Error Level Analysis</span>
+        <span class="axe-score" style="color:${color}">Manipulation: ${elaData.ela_score}%</span>
+      </div>
+      <img src="${elaData.heatmap_base64}" class="ela-heatmap" alt="ELA heatmap"/>
+      <p class="axe-expl">${escapeHtml(elaData.analysis || "")}</p>
+      ${(elaData.flags || []).map((f) => `<span class="flag-tag">${f}</span>`).join("")}
+    </div>`;
+}
+
+/* ══════════════════════════════════════════
+   CHAT UI
 ══════════════════════════════════════════ */
 function appendUserMsg(text, previews) {
   const win = document.getElementById("chatWindow");
@@ -202,11 +397,10 @@ function appendTyping() {
   msg.id = "typingMsg";
   msg.innerHTML = `
     <div class="bot-avatar">${BOT_AVATAR_SVG}</div>
-    <div class="msg-bubble" style="display:flex;flex-direction:column;gap:8px;">
+    <div class="msg-bubble typing-bubble">
       <div class="typing"><span></span><span></span><span></span></div>
-      <span id="typingStepText" style="font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:0.03em;">${STEPS[0]}</span>
-    </div>
-  `;
+      <span id="typingStepText" class="typing-label">${STEPS[0]}</span>
+    </div>`;
   win.appendChild(msg);
   win.scrollTop = win.scrollHeight;
 }
@@ -214,29 +408,30 @@ function removeTyping() {
   document.getElementById("typingMsg")?.remove();
 }
 
-/* ── Verdict labels ── */
+/* ── Verdict labels tunisien ── */
 function verdictLabel(verdict, confidence) {
   if (verdict === "verified")
-    return confidence >= 75 ? "✅ Verified" : "✅ Likely true — stay vigilant";
-  if (verdict === "suspicious")
-    return confidence >= 60 ? "⚠️ Suspicious" : "⚠️ Unclear — be careful";
-  if (verdict === "misleading") return "🔴 Misleading — قطوس في شكارة!";
-  return "🤔 Unknown result";
+    return confidence >= 75
+      ? "✅ Sahha wallah — Verified!"
+      : "✅ Yabi sahha — Likely true";
+  if (verdict === "suspicious") return "⚠️ Zaama… méfie-toi";
+  if (verdict === "misleading") return "🔴 Katous fil chkara — Misleading!";
+  return "🤔 Ma3raftech — Unknown";
 }
 function authLabel(v) {
-  if (v === "authentic") return "✅ Authentic content";
-  if (v === "likely_ai") return "🤖 Likely AI-generated";
-  if (v === "manipulated") return "✂️ Manipulated content";
-  return "❓ Authenticity unknown";
+  if (v === "authentic") return "✅ Contenu authentique";
+  if (v === "likely_ai") return "🤖 Yabi générée par IA";
+  if (v === "manipulated") return "✂️ Contenu manipulé";
+  return "❓ Authenticité inconnue";
 }
 function sourceLabel(v) {
-  if (v === "trusted") return "✅ Trusted source";
-  if (v === "suspicious") return "⚠️ Suspicious source";
-  return "❓ Unknown source";
+  if (v === "trusted") return "✅ Source fiable";
+  if (v === "suspicious") return "⚠️ Source suspecte — meftek";
+  return "❓ Source inconnue";
 }
 
 /* ══════════════════════════════════════════
-   APPEND RESULT BUBBLE
+   APPEND RESULT — FULLY EXPLAINABLE
 ══════════════════════════════════════════ */
 function appendBotResult(data) {
   const win = document.getElementById("chatWindow");
@@ -249,30 +444,39 @@ function appendBotResult(data) {
   const sVerdict = (data.source_verdict || "unknown").toLowerCase();
   const sScore = parseInt(data.source_score ?? 0);
   const authScore = parseInt(data.authenticity_score ?? 0);
-
-  const allFlags = [
-    ...(data.authenticity_flags || []),
-    ...(data.flags || []),
-    ...(data.source_flags || []),
-    ...(data.ml_flags || []),
-  ];
-  const flagsHtml = allFlags.length
-    ? `<div class="result-flags">${allFlags.map((f) => `<span class="flag-tag">${f}</span>`).join("")}</div>`
-    : "";
-
-  // ML badge shown only when ML was available
-  const mlBadge = data.ml_score_text
-    ? `<div class="ml-badge">🤖 ML pre-score: <strong>${data.ml_score_text}</strong></div>`
-    : "";
-
+  const axe2Score = parseInt(data.axe2_score ?? confidence);
   const uid = Date.now();
+
+  /* highlighted text */
+  const highlightedText = data.original_text
+    ? `<div class="highlighted-content">
+        <div class="axe-label" style="margin-bottom:6px">📝 Contenu analysé — mots suspects surlignés</div>
+        <p class="highlighted-text">${highlightSuspiciousWords(data.original_text)}</p>
+       </div>`
+    : "";
+
+  /* RAG block */
+  const ragHtml = buildRagHtml(data.ragData);
+
+  /* ML explainability */
+  const mlHtml = buildMlHtml(data.mlPredict, data.mlFeatures);
+
+  /* ELA heatmap */
+  const elaHtml = buildElaHtml(data.elaData);
+
+  /* Score breakdown */
+  const breakdownHtml = buildScoreBreakdown(
+    authScore,
+    axe2Score,
+    sScore,
+    confidence,
+  );
 
   msg.innerHTML = `
     <div class="bot-avatar">${BOT_AVATAR_SVG}</div>
     <div class="msg-bubble result-bubble ${verdict}">
 
-      ${mlBadge}
-
+      <!-- VERDICT HEADER -->
       <div class="result-top">
         <span class="result-verdict">${verdictLabel(verdict, confidence)}</span>
         <span class="result-score-badge">${confidence}%</span>
@@ -280,46 +484,59 @@ function appendBotResult(data) {
       <div class="score-bar-wrap">
         <div class="score-bar" id="bar-main-${uid}"></div>
       </div>
-      <p class="result-expl">${data.explanation || "—"}</p>
+      <p class="result-expl">${escapeHtml(data.explanation || "—")}</p>
 
-      ${flagsHtml}
+      <!-- SCORE BREAKDOWN (explainable) -->
+      ${breakdownHtml}
 
+      <!-- HIGHLIGHTED TEXT (explainable) -->
+      ${highlightedText}
+
+      <!-- RAG SIMILAR CASES (explainable) -->
+      ${ragHtml}
+
+      <!-- ML EXPLAINABILITY -->
+      ${mlHtml}
+
+      <!-- ELA HEATMAP (if image) -->
+      ${elaHtml}
+
+      <!-- AXE 1 -->
       ${
         authV
           ? `
       <div class="axe-mini axe1-mini">
         <div class="axe-mini-header">
-          <span class="axe-label">Axe 1 · Authenticity</span>
+          <span class="axe-label">Axe 1 · Authenticité du contenu</span>
           <span class="axe-score">${authScore}%</span>
         </div>
-        <div class="score-bar-wrap">
-          <div class="score-bar axe1-bar" id="bar-axe1-${uid}"></div>
-        </div>
+        <div class="score-bar-wrap"><div class="score-bar axe1-bar" id="bar-axe1-${uid}"></div></div>
         <span class="axe-verdict-text">${authLabel(authV)}</span>
-        <p class="axe-expl">${data.authenticity_explanation || "—"}</p>
+        <p class="axe-expl">${escapeHtml(data.authenticity_explanation || "—")}</p>
+        ${(data.authenticity_flags || []).map((f) => `<span class="flag-tag">${f}</span>`).join("")}
       </div>`
           : ""
       }
 
+      <!-- AXE 3 -->
       <div class="axe-mini axe3-mini">
         <div class="axe-mini-header">
-          <span class="axe-label">Axe 3 · Source credibility</span>
+          <span class="axe-label">Axe 3 · Crédibilité source</span>
           <span class="axe-score">${sScore}%</span>
         </div>
-        <div class="score-bar-wrap">
-          <div class="score-bar axe3-bar" id="bar-axe3-${uid}"></div>
-        </div>
+        <div class="score-bar-wrap"><div class="score-bar axe3-bar" id="bar-axe3-${uid}"></div></div>
         <span class="source-badge ${sVerdict}">${sourceLabel(sVerdict)}</span>
-        <p class="axe-expl">${data.source_explanation || "—"}</p>
+        <p class="axe-expl">${escapeHtml(data.source_explanation || "—")}</p>
+        ${(data.source_flags || []).map((f) => `<span class="flag-tag">${f}</span>`).join("")}
       </div>
 
-      <button class="new-analysis-btn" onclick="resetChat()">← Analyze something else</button>
-    </div>
-  `;
+      <button class="new-analysis-btn" onclick="resetChat()">← Analyser autre chose</button>
+    </div>`;
 
   win.appendChild(msg);
   win.scrollTop = win.scrollHeight;
 
+  /* Animate bars */
   setTimeout(() => {
     const setBar = (id, score) => {
       const bar = document.getElementById(id);
@@ -335,6 +552,22 @@ function appendBotResult(data) {
     setBar(`bar-main-${uid}`, confidence);
     setBar(`bar-axe1-${uid}`, authScore);
     setBar(`bar-axe3-${uid}`, sScore);
+
+    /* Animate breakdown bars */
+    document.querySelectorAll(".breakdown-bar").forEach((bar) => {
+      const w = bar.style.width;
+      bar.style.width = "0%";
+      setTimeout(() => {
+        bar.style.width = w;
+      }, 50);
+    });
+    document.querySelectorAll(".ml-prob-bar").forEach((bar) => {
+      const w = bar.style.width;
+      bar.style.width = "0%";
+      setTimeout(() => {
+        bar.style.width = w;
+      }, 100);
+    });
   }, 100);
 }
 
@@ -344,10 +577,7 @@ function appendBotError(text) {
   msg.className = "chat-msg bot";
   msg.innerHTML = `
     <div class="bot-avatar">${BOT_AVATAR_SVG}</div>
-    <div class="msg-bubble error-bubble">
-      ⚠️ ${escapeHtml(text)}<br><small>Try again in a few seconds.</small>
-    </div>
-  `;
+    <div class="msg-bubble error-bubble">⚠️ ${escapeHtml(text)}<br><small>Réessaie dans quelques secondes.</small></div>`;
   win.appendChild(msg);
   win.scrollTop = win.scrollHeight;
 }
@@ -355,9 +585,7 @@ function appendBotError(text) {
 function resetChat() {
   document.getElementById("chatInput").value = "";
   autoResize(document.getElementById("chatInput"));
-  pendingFiles.forEach((p) => URL.revokeObjectURL(p.previewUrl));
-  pendingFiles = [];
-  renderAttachedItems();
+  clearFile();
   document.getElementById("urlInput").value = "";
   document.getElementById("captionInput").value = "";
   if (urlInputVisible) toggleUrlInput();
@@ -375,61 +603,56 @@ function escapeHtml(str) {
 }
 
 /* ══════════════════════════════════════════
-   SYSTEM PROMPTS — Chain-of-Thought style
-   Language injected dynamically per request
+   SYSTEM PROMPTS
 ══════════════════════════════════════════ */
-const SYSTEM_EXTRACT = `You are a message parser. Extract the main content/claim, any caption or headline, and any URL from the user's message.
-Respond ONLY with a valid JSON object, no preamble, no markdown:
-{"content":"<main text to verify>","caption":"<headline if present else empty>","url":"<URL if present else empty>"}`;
+const SYSTEM_EXTRACT = `You are a message parser. Extract the main content/claim, caption, and URL.
+Respond ONLY with valid JSON, no preamble:
+{"content":"<main text>","caption":"<headline if present else empty>","url":"<URL if present else empty>"}`;
 
 function buildAxe1Prompt(lang, mlContext, ragContext) {
   return `You are an expert in digital content authenticity and AI-generated content detection.
 
-Analyze the content step by step:
-1. Does it show signs of AI-generated text? (unnatural fluency, generic phrasing, lack of specific details)
-2. Are there image/video manipulation indicators? (inconsistencies, artifacts)
-3. Is this recycled content used in a misleading new context?
+Step-by-step analysis:
+1. Signs of AI-generated text? (unnatural fluency, generic phrasing, lack of specific details)
+2. Image/video manipulation signs?
+3. Recycled content in misleading context?
 4. Conclusion with confidence score.
 
-${mlContext ? `[ML PRE-SCORE context]: ${mlContext}\n` : ""}${ragContext ? `[RAG SIMILAR CASES]: ${ragContext}\n` : ""}
-IMPORTANT: Respond in ${lang}. Keep explanations concise (2-3 sentences).
-Respond ONLY with valid JSON, no preamble, no markdown:
-{"authenticity_verdict":"authentic"|"likely_ai"|"manipulated","authenticity_score":<0-100>,"authenticity_explanation":"<2-3 sentences in ${lang}>","authenticity_flags":["<flag>"]}`;
+${mlContext ? `[ML PRE-SCORE]: ${mlContext}\n` : ""}${ragContext ? `[RAG SIMILAR CASES]: ${ragContext}\n` : ""}
+Respond in ${lang}. ONLY valid JSON, no preamble:
+{"authenticity_verdict":"authentic"|"likely_ai"|"manipulated","authenticity_score":<0-100>,"authenticity_explanation":"<2-3 sentences>","authenticity_flags":["<flag>"]}`;
 }
 
 function buildAxe2Prompt(lang, mlContext, ragContext) {
   return `You are an expert fact-checker and contextual consistency analyst.
 
-Analyze step by step:
+Step-by-step:
 1. What specific claims does this content make?
-2. Are there internal contradictions or logical inconsistencies?
+2. Internal contradictions or logical inconsistencies?
 3. Does the caption/headline match the actual content?
-4. Is the content being used in a misleading context?
-5. Final verdict with confidence.
+4. Is content used in a misleading context?
+5. Final verdict.
 
-${mlContext ? `[ML PRE-SCORE context]: ${mlContext}\n` : ""}${ragContext ? `[RAG SIMILAR CASES]: ${ragContext}\n` : ""}
-IMPORTANT: Respond in ${lang}. Keep explanations concise.
-Respond ONLY with valid JSON, no preamble, no markdown:
-{"verdict":"verified"|"suspicious"|"misleading","confidence":<0-100>,"explanation":"<2-4 sentences in ${lang}>","flags":["<flag>"]}`;
+${mlContext ? `[ML PRE-SCORE]: ${mlContext}\n` : ""}${ragContext ? `[RAG SIMILAR CASES]: ${ragContext}\n` : ""}
+Respond in ${lang}. ONLY valid JSON, no preamble:
+{"verdict":"verified"|"suspicious"|"misleading","confidence":<0-100>,"explanation":"<2-4 sentences>","flags":["<flag>"]}`;
 }
 
 function buildAxe3Prompt(lang, mlFeatures, ragContext) {
   const domainInfo = mlFeatures
-    ? `ML heuristic source score: ${mlFeatures.source_score}/100 (${mlFeatures.source_verdict}). Domain flags: ${(mlFeatures.combined_flags || []).join(", ")}.`
+    ? `ML heuristic source score: ${mlFeatures.source_score}/100 (${mlFeatures.source_verdict}). Flags: ${(mlFeatures.combined_flags || []).join(", ")}.`
     : "";
-
   return `You are an expert in source credibility analysis.
 
-Analyze the source step by step:
+Step-by-step:
 1. Is the domain known and reputable?
-2. Are there suspicious URL patterns, clickbait indicators, or spoofing signs?
-3. Does the writing style suggest a credible source?
+2. Suspicious URL patterns, clickbait, spoofing?
+3. Writing style credibility?
 4. Final credibility verdict.
 
-${domainInfo ? `[ML heuristic pre-analysis]: ${domainInfo}\n` : ""}${ragContext ? `[RAG SIMILAR CASES]: ${ragContext}\n` : ""}
-IMPORTANT: Respond in ${lang}. Keep explanations concise.
-Respond ONLY with valid JSON, no preamble, no markdown:
-{"source_verdict":"trusted"|"suspicious"|"unknown","source_score":<0-100>,"source_explanation":"<1-2 sentences in ${lang}>","source_flags":["<flag>"]}`;
+${domainInfo ? `[ML heuristic]: ${domainInfo}\n` : ""}${ragContext ? `[RAG SIMILAR CASES]: ${ragContext}\n` : ""}
+Respond in ${lang}. ONLY valid JSON, no preamble:
+{"source_verdict":"trusted"|"suspicious"|"unknown","source_score":<0-100>,"source_explanation":"<1-2 sentences>","source_flags":["<flag>"]}`;
 }
 
 /* ══════════════════════════════════════════
@@ -455,9 +678,40 @@ async function callMLPrescore(text, url) {
       body: JSON.stringify({ text: text || "", url: url || "" }),
     });
     if (!res.ok) return null;
-    return await res.json(); // { mlPredict, mlFeatures }
+    return await res.json();
   } catch {
-    return null; // ML offline → graceful degradation
+    return null;
+  }
+}
+
+async function callRAG(query, url, caption) {
+  try {
+    const res = await fetch("http://localhost:3000/rag", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, url, caption }),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+async function callELA(imageBase64, mediaType) {
+  try {
+    const res = await fetch("http://localhost:5001/ela", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        image_base64: imageBase64,
+        media_type: mediaType,
+      }),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
   }
 }
 
@@ -468,6 +722,15 @@ function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result.split(",")[1]);
+    reader.onerror = () => reject(new Error("FileReader failed"));
+    reader.readAsDataURL(file);
+  });
+}
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
     reader.onerror = () => reject(new Error("FileReader failed"));
     reader.readAsDataURL(file);
   });
@@ -501,7 +764,6 @@ function videoFrame(file) {
 /* ══════════════════════════════════════════
    WEIGHTED SCORE COMBINER
    ML×40% + LLM×60% per axis
-   Then: Axe1×20% + Axe2×50% + Axe3×30%
 ══════════════════════════════════════════ */
 function combineScores(mlScore, llmScore, mlWeight = 0.4) {
   if (mlScore === null || mlScore === undefined) return llmScore;
@@ -509,7 +771,7 @@ function combineScores(mlScore, llmScore, mlWeight = 0.4) {
 }
 
 /* ══════════════════════════════════════════
-   MAIN SEND FUNCTION — 5 steps
+   MAIN SEND — 5-step pipeline
 ══════════════════════════════════════════ */
 async function sendMessage() {
   const input = document.getElementById("chatInput");
@@ -537,7 +799,7 @@ async function sendMessage() {
   appendTyping();
 
   try {
-    /* ── STEP 1: Extract content/caption/URL ── */
+    /* ── STEP 1: Extract signals ── */
     updateTypingStep(0);
     let extractedContent = text;
     let extractedCaption = manualCaption;
@@ -581,67 +843,52 @@ async function sendMessage() {
       }
     }
 
-    /* ── STEP 3: ML pre-score (TF-IDF + heuristics) ── */
+    /* ── STEP 3: ML pre-score ── */
     updateTypingStep(2);
     const textForML = scrapedContent || extractedContent || "";
     const mlResult = await callMLPrescore(textForML, extractedUrl);
+    const mlPredict = mlResult?.mlPredict || null;
+    const mlFeatures = mlResult?.mlFeatures || null;
 
-    const mlPredict = mlResult?.mlPredict || null; // TF-IDF result
-    const mlFeatures = mlResult?.mlFeatures || null; // heuristic source score
-
-    // Build ML context string to inject into prompts
     let mlContextText = null;
     if (mlPredict) {
       mlContextText =
-        `TF-IDF classifier: fake_probability=${(mlPredict.fake_probability * 100).toFixed(0)}%, ` +
-        `real_probability=${(mlPredict.real_probability * 100).toFixed(0)}%, ` +
-        `verdict=${mlPredict.ml_verdict} (${mlPredict.confidence_label} confidence). ` +
-        `Linguistic signals — clickbait_count:${mlPredict.clickbait_count}, ` +
-        `caps_ratio:${(mlPredict.caps_ratio * 100).toFixed(0)}%, ` +
-        `lexical_diversity:${mlPredict.lexical_diversity}. ` +
+        `TF-IDF: fake_prob=${(mlPredict.fake_probability * 100).toFixed(0)}%, ` +
+        `real_prob=${(mlPredict.real_probability * 100).toFixed(0)}%, ` +
+        `verdict=${mlPredict.ml_verdict} (${mlPredict.confidence_label}). ` +
+        `Linguistic: clickbait=${mlPredict.clickbait_count}, caps=${(mlPredict.caps_ratio * 100).toFixed(0)}%. ` +
         (mlPredict.flags?.length
-          ? `ML flags: ${mlPredict.flags.join(", ")}.`
+          ? `Flags: ${mlPredict.flags.join(", ")}.`
           : "");
     }
 
-    /* ── STEP 3B: RAG Search (Retrieval-Augmented Generation) ── */
-    let ragContext = "";
-    let contextualGapScore = 0;
-    let ragQuickFlags = [];
-    try {
-      const ragRes = await fetch("http://localhost:3000/rag", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          query: textForML || extractedContent,
-          url: extractedUrl,
-          caption: extractedCaption,
-        }),
-      });
-      if (ragRes.ok) {
-        const ragData = await ragRes.json();
-        ragContext = ragData.ragContext || "";
-        contextualGapScore = ragData.contextualGapScore || 0;
-        ragQuickFlags = ragData.quickFlagsResult?.flags || [];
+    /* ── STEP 4: RAG search ── */
+    updateTypingStep(3);
+    const ragData = await callRAG(
+      textForML || extractedContent,
+      extractedUrl,
+      extractedCaption,
+    );
+    let ragContext = ragData?.ragContext || "";
 
-        // Add gap score to ML context
-        if (contextualGapScore > 50) {
-          mlContextText += `\n[RAG contextual-gap-score]: ${contextualGapScore} (caption-content mismatch detected).`;
-        }
-        // Add quick flags
-        if (ragQuickFlags.length > 0) {
-          mlContextText += `\n[RAG detected flags]: ${ragQuickFlags.join(", ")}.`;
-        }
-      }
-    } catch {
-      /* non-blocking — RAG failure doesn't block analysis */
+    if (ragData?.contextualGapScore > 50) {
+      mlContextText =
+        (mlContextText || "") +
+        `\n[RAG gap score]: ${ragData.contextualGapScore}% (caption-content mismatch).`;
+    }
+    if (ragData?.quickFlagsResult?.flags?.length > 0) {
+      mlContextText =
+        (mlContextText || "") +
+        `\n[RAG flags]: ${ragData.quickFlagsResult.flags.join(", ")}.`;
     }
 
-    /* ── STEP 4: 3-axis AI analysis (parallel) ── */
-    updateTypingStep(3);
-
-    // Build media blocks
+    /* ── STEP 5: Build media blocks + ELA ── */
+    updateTypingStep(4);
     let userContentMain = [];
+    let elaData = null;
+    let firstImageB64 = null;
+    let firstImageType = null;
+
     for (const item of localFiles) {
       const b64 =
         item.type === "video"
@@ -653,20 +900,29 @@ async function sendMessage() {
         type: "image",
         source: { type: "base64", media_type: mediaType, data: b64 },
       });
+
+      /* Run ELA on first image */
+      if (!firstImageB64 && item.type === "image") {
+        firstImageB64 = `data:${mediaType};base64,${b64}`;
+        firstImageType = mediaType;
+      }
     }
 
-    // Build text context block
+    /* Call ELA if we have an image */
+    if (firstImageB64) {
+      elaData = await callELA(firstImageB64, firstImageType);
+      if (elaData && mlContextText !== null) {
+        mlContextText += `\n[ELA image forensics]: manipulation_score=${elaData.ela_score}%, flags=${(elaData.flags || []).join(", ")}.`;
+      }
+    }
+
+    /* Build text context */
     const contentForAnalysis =
       scrapedContent || extractedContent || "(no text provided)";
     const contextParts = [];
-    if (extractedCaption)
-      contextParts.push(`Caption/Headline: "${extractedCaption}"`);
+    if (extractedCaption) contextParts.push(`Caption: "${extractedCaption}"`);
     if (extractedUrl) contextParts.push(`Source URL: ${extractedUrl}`);
     contextParts.push(`Content:\n${contentForAnalysis}`);
-    if (localFiles.length > 0)
-      contextParts.push(
-        `Attached media: ${localFiles.map((f) => f.file.name).join(", ")}`,
-      );
 
     userContentMain.push({
       type: "text",
@@ -678,11 +934,12 @@ async function sendMessage() {
       {
         type: "text",
         text: extractedUrl
-          ? `Analyze source credibility for: ${extractedUrl}\nContext: "${extractedCaption || extractedContent}"\nReturn only the JSON verdict.`
-          : `No URL. Analyze credibility of claim: "${extractedContent}"\nReturn only the JSON verdict.`,
+          ? `Source URL: ${extractedUrl}\nContext: "${extractedCaption || extractedContent}"\nReturn only the JSON verdict.`
+          : `No URL. Analyze claim credibility: "${extractedContent}"\nReturn only the JSON verdict.`,
       },
     ];
 
+    /* ── 3 parallel AI calls ── */
     const [result1, result2, result3] = await Promise.all([
       callAPI(
         buildAxe1Prompt(lang, mlContextText, ragContext),
@@ -695,52 +952,56 @@ async function sendMessage() {
       callAPI(buildAxe3Prompt(lang, mlFeatures, ragContext), userContentAxe3),
     ]);
 
-    /* ── STEP 5: Compute combined score ── */
-    updateTypingStep(4);
-
-    // Per-axis: ML×40% + LLM×60%
-    const mlAuth = mlPredict ? mlPredict.ml_score : null; // 0-100
-    const mlSrcScore = mlFeatures ? mlFeatures.source_score : null; // 0-100
+    /* ── Combine scores: ML×40% + LLM×60% ── */
+    const mlAuth = mlPredict ? mlPredict.ml_score : null;
+    const mlSrcScore = mlFeatures ? mlFeatures.source_score : null;
 
     const axe1Combined = combineScores(
       mlAuth,
       result1.authenticity_score ?? 50,
       0.4,
     );
-    const axe2Score = result2.confidence ?? 50; // no ML equivalent for consistency
+    const axe2Score = result2.confidence ?? 50;
     const axe3Combined = combineScores(
       mlSrcScore,
       result3.source_score ?? 50,
       0.4,
     );
 
-    // Global: Axe1×20% + Axe2×50% + Axe3×30%
-    const combinedScore = Math.round(
-      axe1Combined * 0.2 + axe2Score * 0.5 + axe3Combined * 0.3,
-    );
+    /* ELA boost for Axe1 */
+    const axe1Final = elaData
+      ? Math.round(axe1Combined * 0.6 + (100 - elaData.ela_score) * 0.4)
+      : axe1Combined;
 
-    // ML badge text
-    let mlScoreText = null;
-    if (mlPredict) {
-      mlScoreText = `${mlPredict.ml_verdict} (${(mlPredict.real_probability * 100).toFixed(0)}% authentic) via TF-IDF`;
-    }
+    /* Global: Axe1×20% + Axe2×50% + Axe3×30% */
+    const combinedScore = Math.round(
+      axe1Final * 0.2 + axe2Score * 0.5 + axe3Combined * 0.3,
+    );
 
     removeTyping();
     appendBotResult({
-      authenticity_verdict: result1.authenticity_verdict,
-      authenticity_score: axe1Combined,
-      authenticity_explanation: result1.authenticity_explanation,
-      authenticity_flags: result1.authenticity_flags,
+      /* Verdicts */
       verdict: result2.verdict,
       confidence: combinedScore,
       explanation: result2.explanation,
       flags: result2.flags,
+      axe2_score: axe2Score,
+      /* Axe 1 */
+      authenticity_verdict: result1.authenticity_verdict,
+      authenticity_score: axe1Final,
+      authenticity_explanation: result1.authenticity_explanation,
+      authenticity_flags: result1.authenticity_flags,
+      /* Axe 3 */
       source_verdict: result3.source_verdict,
       source_score: axe3Combined,
       source_explanation: result3.source_explanation,
       source_flags: result3.source_flags,
-      ml_flags: mlPredict?.flags || [],
-      ml_score_text: mlScoreText,
+      /* Explainability data */
+      original_text: extractedContent || scrapedContent,
+      ragData,
+      mlPredict,
+      mlFeatures,
+      elaData,
     });
   } catch (err) {
     removeTyping();

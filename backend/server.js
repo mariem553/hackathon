@@ -112,11 +112,14 @@ async function callML(endpoint, body) {
    [5/5] Computing combined score
 ══════════════════════════════════════════ */
 app.post("/analyze", async (req, res) => {
+  console.log("[analyze] Received request");
   const { systemPrompt, userContent, mlContext } = req.body;
 
   if (!userContent || !Array.isArray(userContent)) {
+    console.error("[analyze] Invalid request: no userContent or not array");
     return res.status(400).json({ error: "No userContent provided" });
   }
+  console.log("[analyze] userContent items:", userContent.length);
 
   const hasImage = userContent.some((b) => b.type === "image");
   const model = hasImage
@@ -169,10 +172,11 @@ app.post("/analyze", async (req, res) => {
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error("[groq error]", response.status, errText);
+      console.error("[groq error] Status:", response.status);
+      console.error("[groq error] Response:", errText.substring(0, 500));
       return res
         .status(502)
-        .json({ error: "Groq API error", details: errText });
+        .json({ error: "Groq API error", details: errText.substring(0, 200) });
     }
 
     const data = await response.json();
@@ -180,7 +184,8 @@ app.post("/analyze", async (req, res) => {
     console.log(`[groq ok] model:${model} chars:${text.length}`);
     res.json({ result: text });
   } catch (err) {
-    console.error("[server error]", err.message);
+    console.error("[server error] Analyze:", err.message);
+    console.error("[server error] Stack:", err.stack?.substring(0, 300));
     res.status(500).json({ error: "Server error: " + err.message });
   }
 });
