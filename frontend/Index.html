@@ -3,8 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>قطوس في شكارة — Context Checker</title>
-  <link rel="icon" href="data:,">
+  <title>قطوس في شكارة — زعما صحيحة؟</title>
   <link rel="stylesheet" href="style.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
@@ -29,229 +28,86 @@
         <circle cx="18" cy="12.3" r="0.5" fill="white"/>
         <circle cx="23" cy="12.3" r="0.5" fill="white"/>
         <path d="M19.5 15 L20 15.5 L20.5 15 L20 14.5 Z" fill="#ff9de2"/>
-        <line x1="14" y1="15" x2="18.5" y2="15.5" stroke="#0a0a0d" stroke-width="0.6" opacity="0.6"/>
-        <line x1="14" y1="16.5" x2="18.5" y2="16" stroke="#0a0a0d" stroke-width="0.6" opacity="0.6"/>
-        <line x1="21.5" y1="15.5" x2="26" y2="15" stroke="#0a0a0d" stroke-width="0.6" opacity="0.6"/>
-        <line x1="21.5" y1="16" x2="26" y2="16.5" stroke="#0a0a0d" stroke-width="0.6" opacity="0.6"/>
         <path d="M13 23 Q11 22 12 20 Q14 19 15 21 Q16 19 18 20 Q18 22 16 23 Z" fill="#d4a8ff" opacity="0.7"/>
       </svg>
       <div class="logo-text-wrap">
         <span class="logo-arabic">قطوس في شكارة</span>
-        <span class="logo-latin">AI VERIFICATION</span>
+        <span class="logo-latin">AI VERIFICATION · 3 AXES</span>
       </div>
     </a>
-    <div class="header-tag">Authenticity · Consistency · Credibility</div>
+    <div class="header-tag">زعما صحيحة؟</div>
   </header>
 
   <main>
-    <section class="hero">
-      <p class="hero-label">[ AI-powered verification · 3 axes ]</p>
-      <h1 class="hero-title">Is this content<br><em>telling the truth?</em></h1>
-      <p class="hero-sub">Paste text, drop an image, a video, or a URL.<br>We run 3 AI axes in parallel — authenticity, consistency, and source credibility.</p>
-    </section>
+    <div class="chat-window" id="chatWindow">
 
-    <!-- EXAMPLES -->
-    <section class="examples-section">
-      <p class="examples-label">Try an example</p>
-      <div class="examples-row">
-        <button type="button" class="example-btn" onclick="loadExample('fake')">🔴 Fake news</button>
-        <button type="button" class="example-btn" onclick="loadExample('suspicious')">🟡 Suspicious source</button>
-        <button type="button" class="example-btn" onclick="loadExample('verified')">🟢 Legit content</button>
+      <!-- FIRST MESSAGE: TUNISIAN ONLY - CAPTIVATING -->
+      <div class="chat-msg bot">
+        <div class="bot-avatar">
+          <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M8 17 Q8 13 12 13 L28 13 Q32 13 32 17 L30 34 Q30 36 28 36 L12 36 Q10 36 10 34 Z" fill="#1a1a28" stroke="#d4a8ff" stroke-width="1.2"/>
+            <path d="M14 13 Q20 9 26 13" stroke="#d4a8ff" stroke-width="1.2" stroke-linecap="round" fill="none"/>
+            <ellipse cx="20" cy="13" rx="6" ry="5" fill="#d4a8ff"/>
+            <path d="M15 10 L14 6 L18 9 Z" fill="#d4a8ff"/>
+            <path d="M25 10 L26 6 L22 9 Z" fill="#d4a8ff"/>
+            <path d="M15.5 9.5 L14.8 7.2 L17.2 9 Z" fill="#ff9de2"/>
+            <path d="M24.5 9.5 L25.2 7.2 L22.8 9 Z" fill="#ff9de2"/>
+            <ellipse cx="17.5" cy="13" rx="1.5" ry="1.8" fill="#0a0a0d"/>
+            <ellipse cx="22.5" cy="13" rx="1.5" ry="1.8" fill="#0a0a0d"/>
+            <circle cx="18" cy="12.3" r="0.5" fill="white"/>
+            <circle cx="23" cy="12.3" r="0.5" fill="white"/>
+            <path d="M19.5 15 L20 15.5 L20.5 15 L20 14.5 Z" fill="#ff9de2"/>
+            <path d="M13 23 Q11 22 12 20 Q14 19 15 21 Q16 19 18 20 Q18 22 16 23 Z" fill="#d4a8ff" opacity="0.7"/>
+          </svg>
+        </div>
+        <div class="msg-bubble">
+          <p style="font-size: 1.2em; font-family: 'DM Serif Display', serif;">🌟 <strong>زعما صحيحة؟</strong> 🌟</p>
+          <p>🐱 <em>"Zaama shih wala katous fel chkara?"</em>
+          <p>📎donne moi : <strong>texte, lien, image, vidéo, titre</strong> </p>
+          <p>⚡ 3 axes d'analyse: Authenticité, Consistance, Crédibilité</p>
+          <hr style="border-color: #252530; margin: 10px 0;">
+          <p>👇 <strong>tu peux essayer</strong> Chouf les exemples:</p>
+          <div class="suggestions">
+            <button onclick="loadSuggestion('fake')">🔴 Fake news</button>
+            <button onclick="loadSuggestion('suspicious')">🟡 Source suspecte</button>
+            <button onclick="loadSuggestion('verified')">🟢 Info vraie</button>
+          </div>
+          <p style="font-size: 11px; color: #7070a0; margin-top: 8px;">💡 <em>Après ton premier message, je répondrai dans ta langue (français, anglais, tunisien mixte).</em></p>
+        </div>
       </div>
-    </section>
 
-    <section class="form-section">
-      <form id="analyzeForm">
-
-        <!-- MULTIMODAL INPUT -->
-        <div class="field">
-          <label>
-            <span class="field-num">01</span>
-            Content to analyze
-          </label>
-
-          <div class="tab-bar" role="tablist">
-            <button type="button" class="tab-btn active" data-tab="text" role="tab" aria-selected="true" onclick="switchTab('text')">
-              <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1" y="2" width="12" height="10" rx="1.5"/><line x1="3.5" y1="5" x2="10.5" y2="5"/><line x1="3.5" y1="7.5" x2="8" y2="7.5"/><line x1="3.5" y1="10" x2="6" y2="10"/></svg>
-              Text
-            </button>
-            <button type="button" class="tab-btn" data-tab="image" role="tab" aria-selected="false" onclick="switchTab('image')">
-              <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1" y="2" width="12" height="10" rx="1.5"/><circle cx="4.5" cy="5.5" r="1"/><path d="M1 9.5 L4 7 L7 9.5 L10 7 L13 9.5"/></svg>
-              Image
-            </button>
-            <button type="button" class="tab-btn" data-tab="video" role="tab" aria-selected="false" onclick="switchTab('video')">
-              <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1" y="3" width="9" height="8" rx="1.5"/><path d="M10 5.5 L13 4 L13 10 L10 8.5 Z"/></svg>
-              Video
-            </button>
-            <button type="button" class="tab-btn" data-tab="url" role="tab" aria-selected="false" onclick="switchTab('url')">
-              <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M6 7a3 3 0 0 0 4.24 0l1.5-1.5a3 3 0 0 0-4.24-4.24L6 2.75"/><path d="M8 7a3 3 0 0 0-4.24 0L2.26 8.5A3 3 0 0 0 6.5 12.74L9 11.25"/></svg>
-              URL
-            </button>
-          </div>
-
-          <div class="input-zone" id="inputZone">
-
-            <div class="mm-pane active" id="pane-text" role="tabpanel">
-              <textarea id="contentText" name="content_text" rows="5" placeholder="Paste the article text, post, caption, or description here…"></textarea>
-            </div>
-
-            <div class="mm-pane" id="pane-image" role="tabpanel">
-              <div class="drop-zone" id="dropImage" ondragover="mmDragOver(event,'dropImage')" ondragleave="mmDragLeave('dropImage')" ondrop="mmDropFile(event,'image')">
-                <input type="file" accept="image/*" id="imgInput" name="content_image" onchange="mmFileChosen(event,'image')">
-                <div class="drop-icon"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="3" width="18" height="16" rx="2.5"/><circle cx="7" cy="8" r="1.8"/><path d="M2 15 L6.5 11 L10.5 15 L15 11 L20 15"/></svg></div>
-                <div class="drop-label"><strong>Click to upload</strong> or drag &amp; drop an image</div>
-                <div class="drop-hint">PNG · JPG · WEBP · GIF — max 20 MB</div>
-              </div>
-              <div class="preview-strip" id="previewImage"></div>
-            </div>
-
-            <div class="mm-pane" id="pane-video" role="tabpanel">
-              <div class="drop-zone" id="dropVideo" ondragover="mmDragOver(event,'dropVideo')" ondragleave="mmDragLeave('dropVideo')" ondrop="mmDropFile(event,'video')">
-                <input type="file" accept="video/*" id="vidInput" name="content_video" onchange="mmFileChosen(event,'video')">
-                <div class="drop-icon"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="4" width="13" height="14" rx="2.5"/><path d="M15 8.5 L20 6 L20 16 L15 13.5 Z"/></svg></div>
-                <div class="drop-label"><strong>Click to upload</strong> or drag &amp; drop a video</div>
-                <div class="drop-hint">MP4 · MOV · WEBM — max 50 MB</div>
-              </div>
-              <div class="preview-strip" id="previewVideo"></div>
-            </div>
-
-            <div class="mm-pane" id="pane-url" role="tabpanel">
-              <div class="url-pane">
-                <span class="url-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M7 8a3.5 3.5 0 0 0 4.95 0l1.75-1.75A3.5 3.5 0 0 0 8.75 1.3L7 3.05"/><path d="M9 8a3.5 3.5 0 0 0-4.95 0L2.3 9.75A3.5 3.5 0 0 0 7.25 14.7L9 12.95"/></svg></span>
-                <input type="url" id="contentUrl" name="content_url" placeholder="https://example.com/article-to-verify…">
-              </div>
-            </div>
-
-            <div class="zone-footer">
-              <div class="zone-footer-status">
-                <div class="status-pill" id="mmStatusPill"></div>
-                <span id="mmStatusLabel">Waiting for content</span>
-              </div>
-              <span id="mmCharCount"></span>
-            </div>
-          </div>
-        </div>
-
-        <div class="field-row">
-          <div class="field">
-            <label for="caption"><span class="field-num">02</span> Title or caption</label>
-            <input type="text" id="caption" name="caption" placeholder="The headline or caption being claimed…" />
-          </div>
-          <div class="field">
-            <label for="sourceUrl"><span class="field-num">03</span> Source URL <span class="optional">optional</span></label>
-            <input type="url" id="sourceUrl" name="url" placeholder="https://example.com/article" />
-          </div>
-        </div>
-
-        <button type="submit" id="submitBtn">
-          <span class="btn-text">Analyze content</span>
-          <span class="btn-arrow">→</span>
-          <span class="btn-loader" hidden><span></span><span></span><span></span></span>
-        </button>
-
-      </form>
-    </section>
-
-    <!-- GLOBAL VERDICT BANNER -->
-    <div class="global-verdict" id="globalVerdict" hidden>
-      <span id="globalIcon"></span>
-      <span id="globalText"></span>
-      <span id="globalScore"></span>
     </div>
 
-    <!-- RESULTS -->
-    <section class="result-section" id="resultSection" hidden>
-
-      <!-- AXE 1 — Content Authenticity -->
-      <div class="result-label">Content authenticity — Axe 1</div>
-      <div class="result-card" id="axe1Result" hidden>
-        <div class="result-header">
-          <div class="result-status">
-            <span class="status-dot" id="axe1Dot"></span>
-            <span id="axe1Verdict">—</span>
-          </div>
-          <div class="result-score">
-            <span class="score-label">authenticity score</span>
-            <span class="score-value" id="axe1Score">—</span>
-          </div>
-        </div>
-        <div class="score-bar-wrap"><div class="score-bar" id="axe1Bar"></div></div>
-        <div class="result-explanation" id="axe1Explanation">—</div>
-        <div class="result-flags" id="axe1Flags"></div>
+    <!-- INPUT BAR -->
+    <div class="chat-input-bar">
+      <div id="filePreviewBar" class="file-preview-bar" style="display:none">
+        <img id="filePreviewImg" style="max-width: 40px; max-height: 40px; border-radius: 4px; display: none;">
+        <span id="filePreviewName">—</span>
+        <button onclick="clearFile()">×</button>
       </div>
-
-      <!-- AXE 2 — Contextual Consistency -->
-      <div class="result-label" style="margin-top:24px;">Contextual consistency — Axe 2</div>
-      <div class="result-card" id="resultCard">
-        <div class="result-header">
-          <div class="result-status" id="resultStatus">
-            <span class="status-dot" id="statusDot"></span>
-            <span id="statusText">—</span>
-          </div>
-          <div class="result-score">
-            <span class="score-label">combined score</span>
-            <span class="score-value" id="scoreValue">—</span>
-          </div>
-        </div>
-        <div class="score-bar-wrap"><div class="score-bar" id="scoreBar"></div></div>
-        <div class="result-explanation" id="resultExplanation">—</div>
-        <div class="result-flags" id="resultFlags"></div>
-        <div class="result-raw-toggle" id="rawToggle">
-          <span>view raw response</span>
-          <span class="toggle-arrow">↓</span>
-        </div>
-        <pre class="result-raw" id="resultRaw" hidden></pre>
+      <div class="chat-input-wrap">
+        <textarea
+          id="chatInput"
+          placeholder="Zaama c'est vrai que… / Colle un lien / Pose une question…"
+          rows="1"
+          onkeydown="handleKey(event)"
+          oninput="autoResize(this)"
+        ></textarea>
+        <label class="attach-btn" title="Joindre une image ou vidéo">
+          <input type="file" accept="image/*,video/*" id="fileInput" onchange="handleFile(event)" hidden>
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4">
+            <path d="M16 9.5l-6 6a4.5 4.5 0 01-6.36-6.36l6-6a3 3 0 014.24 4.24l-6 6a1.5 1.5 0 01-2.12-2.12l5.5-5.5"/>
+          </svg>
+        </label>
+        <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M15 9H3M9 3l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
       </div>
-
-      <!-- AXE 3 — Source Credibility -->
-      <div class="result-label" style="margin-top:24px;">Source credibility — Axe 3</div>
-      <div class="result-card" id="sourceResult" hidden>
-        <div class="result-header">
-          <div class="result-status">
-            <span class="status-dot" id="sourceDot"></span>
-            <span id="sourceVerdict">—</span>
-          </div>
-          <div class="result-score">
-            <span class="score-label">source score</span>
-            <span class="score-value" id="sourceScore">—</span>
-          </div>
-        </div>
-        <div class="score-bar-wrap"><div class="score-bar" id="sourceBar"></div></div>
-        <div class="result-explanation" id="sourceExplanation">—</div>
-        <div class="result-flags" id="sourceFlags"></div>
-      </div>
-
-    </section>
-
-    <!-- RESET BUTTON -->
-    <button type="button" id="analyzeAnotherBtn" class="reset-btn" hidden onclick="resetAll()">
-      ← Analyze another content
-    </button>
-
-    <!-- CONSOLE -->
-    <section class="console-section" id="consoleSection" hidden>
-      <div class="console-header">
-        <span class="console-dot red"></span>
-        <span class="console-dot yellow"></span>
-        <span class="console-dot green"></span>
-        <span class="console-title">browser console output</span>
-      </div>
-      <pre class="console-body" id="consoleBody"></pre>
-    </section>
-
+      <p class="input-hint">Entrée pour envoyer · Shift+Entrée pour nouvelle ligne</p>
+    </div>
   </main>
-
-  <footer>
-    <span class="footer-cat">
-      <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <ellipse cx="9" cy="10" rx="5" ry="5" fill="currentColor" opacity="0.4"/>
-        <path d="M5.5 7 L4 4 L7 6.5 Z" fill="currentColor" opacity="0.4"/>
-        <path d="M12.5 7 L14 4 L11 6.5 Z" fill="currentColor" opacity="0.4"/>
-      </svg>
-      قطوس في شكارة · Hackathon 2026
-    </span>
-    <span>Axe 1 · Axe 2 · Axe 3 — AI Verification</span>
-  </footer>
 
   <script src="App.js"></script>
 </body>

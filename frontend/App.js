@@ -1,746 +1,447 @@
 /* ══════════════════════════════════════════
-   قطوس في شكارة — App.js
-   Axe 1 · Content Authenticity (NEW)
-   Axe 2 · Contextual Consistency
-   Axe 3 · Source Credibility
-   ✅ Real URL scraping via /fetch-url
-   ✅ 3 parallel AI calls
-   ✅ Global verdict banner
-   ✅ Score bar color by confidence
-   ✅ Reset / analyze another
+   قطوس في شكارة — Zaama Sahih?
+   ✅ First message in Tunisian (captivating)
+   ✅ Then switch to user's language
+   ✅ Support images/videos/URLs + titles
+   ✅ Source + content + caption (flexible)
 ══════════════════════════════════════════ */
 
-/* ─── Multimodal state ─── */
-let mmCurrentTab = "text";
-let mmFile = null;
-let mmFileType = null;
+/* ─── State ─── */
+let pendingFile = null;
+let pendingFileType = null;
+let pendingFileB64 = null;
+let currentLanguage = "en"; // Default, will detect from user
 
 /* ══════════════════════════════════════════
-   EXAMPLES
+   BOT AVATAR SVG (logo Katous)
 ══════════════════════════════════════════ */
+const BOT_AVATAR_SVG = `
+<svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M8 17 Q8 13 12 13 L28 13 Q32 13 32 17 L30 34 Q30 36 28 36 L12 36 Q10 36 10 34 Z" fill="#1a1a28" stroke="#d4a8ff" stroke-width="1.2"/>
+  <path d="M14 13 Q20 9 26 13" stroke="#d4a8ff" stroke-width="1.2" stroke-linecap="round" fill="none"/>
+  <ellipse cx="20" cy="13" rx="6" ry="5" fill="#d4a8ff"/>
+  <path d="M15 10 L14 6 L18 9 Z" fill="#d4a8ff"/>
+  <path d="M25 10 L26 6 L22 9 Z" fill="#d4a8ff"/>
+  <path d="M15.5 9.5 L14.8 7.2 L17.2 9 Z" fill="#ff9de2"/>
+  <path d="M24.5 9.5 L25.2 7.2 L22.8 9 Z" fill="#ff9de2"/>
+  <ellipse cx="17.5" cy="13" rx="1.5" ry="1.8" fill="#0a0a0d"/>
+  <ellipse cx="22.5" cy="13" rx="1.5" ry="1.8" fill="#0a0a0d"/>
+  <circle cx="18" cy="12.3" r="0.5" fill="white"/>
+  <circle cx="23" cy="12.3" r="0.5" fill="white"/>
+  <path d="M19.5 15 L20 15.5 L20.5 15 L20 14.5 Z" fill="#ff9de2"/>
+  <path d="M13 23 Q11 22 12 20 Q14 19 15 21 Q16 19 18 20 Q18 22 16 23 Z" fill="#d4a8ff" opacity="0.7"/>
+</svg>`;
 
-const EXAMPLES = {
-  fake: {
-    text: "Catastrophic floods have completely destroyed the city of Paris today. Thousands of people are evacuating as the Eiffel Tower is surrounded by water. French authorities have declared a national emergency.",
-    caption: "Paris underwater — catastrophic floods destroy the city today",
-    url: "https://breaking-news24.net/paris-floods-emergency",
-  },
-  suspicious: {
-    text: "Scientists have discovered that drinking 10 glasses of lemon water every day completely cures cancer in just 2 weeks. Big pharma doesn't want you to know this secret remedy that has been hidden for decades.",
-    caption: "The cancer cure they don't want you to know about",
-    url: "https://healthtruth-secrets.info/cancer-cure-lemon",
-  },
-  verified: {
-    text: "NASA has confirmed that the James Webb Space Telescope has captured the deepest infrared image of the universe ever taken. The image shows thousands of galaxies, some of which formed less than a billion years after the Big Bang.",
-    caption:
-      "NASA releases deepest infrared image of the universe from James Webb Telescope",
-    url: "https://www.nasa.gov/webbtelescope",
-  },
+/* ══════════════════════════════════════════
+   SUGGESTIONS
+══════════════════════════════════════════ */
+const SUGGESTIONS = {
+  fake: "Zaama c'est vrai que des inondations ont détruit Paris aujourd'hui ? https://breaking-news24.net/paris-floods-emergency",
+  suspicious:
+    "Zaama sahha que boire du jus de citron guérit le cancer en 2 semaines ? https://healthtruth-secrets.info/cancer-cure",
+  verified:
+    "NASA has released the deepest infrared image of the universe from the James Webb Space Telescope. https://www.nasa.gov/webbtelescope",
 };
 
-function loadExample(type) {
-  const ex = EXAMPLES[type];
-  if (!ex) return;
-  switchTab("text");
-  const textArea = document.getElementById("contentText");
-  const caption = document.getElementById("caption");
-  const sourceUrl = document.getElementById("sourceUrl");
-  if (textArea) textArea.value = ex.text;
-  if (caption) caption.value = ex.caption;
-  if (sourceUrl) sourceUrl.value = ex.url;
-  mmUpdateStatus();
-  document
-    .getElementById("analyzeForm")
-    .scrollIntoView({ behavior: "smooth", block: "start" });
+function loadSuggestion(type) {
+  const input = document.getElementById("chatInput");
+  input.value = SUGGESTIONS[type];
+  autoResize(input);
+  input.focus();
 }
 
 /* ══════════════════════════════════════════
-   TAB SWITCHING
+   DETECT USER LANGUAGE
 ══════════════════════════════════════════ */
+function detectLanguage(text) {
+  const arabicPattern = /[\u0600-\u06FF]/;
+  const frenchPattern = /[éèêëàâçîïôûùüÿœ]/i;
+  const tunisianMarkers =
+    /(zaama|sahha|mouch|barcha|chnowa|andek|mtaa|hatha|hethi)/i;
 
-function switchTab(tab) {
-  mmCurrentTab = tab;
-  document.querySelectorAll(".tab-btn").forEach((btn) => {
-    const active = btn.dataset.tab === tab;
-    btn.classList.toggle("active", active);
-    btn.setAttribute("aria-selected", active);
-  });
-  document.querySelectorAll(".mm-pane").forEach((pane) => {
-    pane.classList.toggle("active", pane.id === "pane-" + tab);
-  });
-  mmUpdateStatus();
+  if (tunisianMarkers.test(text)) return "tun";
+  if (arabicPattern.test(text)) return "ar";
+  if (frenchPattern.test(text)) return "fr";
+  return "en";
 }
 
-const textArea = document.getElementById("contentText");
-if (textArea) {
-  textArea.addEventListener("input", mmUpdateStatus);
-  textArea.addEventListener("focus", () =>
-    document.getElementById("inputZone").classList.add("focused"),
-  );
-  textArea.addEventListener("blur", () =>
-    document.getElementById("inputZone").classList.remove("focused"),
-  );
-}
-
-const urlInput = document.getElementById("contentUrl");
-if (urlInput) {
-  urlInput.addEventListener("input", mmUpdateStatus);
-  urlInput.addEventListener("focus", () =>
-    document.getElementById("inputZone").classList.add("focused"),
-  );
-  urlInput.addEventListener("blur", () =>
-    document.getElementById("inputZone").classList.remove("focused"),
-  );
-}
-
-function mmDragOver(e, dropId) {
-  e.preventDefault();
-  document.getElementById(dropId).classList.add("drag-over");
-}
-
-function mmDragLeave(dropId) {
-  document.getElementById(dropId).classList.remove("drag-over");
-}
-
-function mmDropFile(e, type) {
-  e.preventDefault();
-  mmDragLeave(type === "image" ? "dropImage" : "dropVideo");
-  const file = e.dataTransfer.files[0];
-  if (file) mmRenderPreview(file, type);
-}
-
-function mmFileChosen(e, type) {
+/* ══════════════════════════════════════════
+   FILE HANDLING
+══════════════════════════════════════════ */
+function handleFile(e) {
   const file = e.target.files[0];
-  if (file) mmRenderPreview(file, type);
-}
+  if (!file) return;
+  pendingFile = file;
+  pendingFileType = file.type.startsWith("video") ? "video" : "image";
 
-function mmRenderPreview(file, type) {
-  mmFile = file;
-  mmFileType = type;
-  const stripId = type === "image" ? "previewImage" : "previewVideo";
-  const strip = document.getElementById(stripId);
-  const blobUrl = URL.createObjectURL(file);
-  const sizeStr =
-    file.size < 1_048_576
-      ? (file.size / 1024).toFixed(0) + " KB"
-      : (file.size / 1_048_576).toFixed(1) + " MB";
+  const bar = document.getElementById("filePreviewBar");
+  const name = document.getElementById("filePreviewName");
+  const previewImg = document.getElementById("filePreviewImg");
 
-  const thumb = document.createElement("div");
-  thumb.className = "preview-thumb";
+  name.textContent = `📎 ${file.name} (${(file.size / 1024).toFixed(0)} KB)`;
 
-  if (type === "image") {
-    const img = document.createElement("img");
-    img.src = blobUrl;
-    img.alt = file.name;
-    thumb.appendChild(img);
+  // Show image preview if it's an image
+  if (file.type.startsWith("image")) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      previewImg.src = e.target.result;
+      previewImg.style.display = "block";
+    };
+    reader.readAsDataURL(file);
   } else {
-    const vid = document.createElement("video");
-    vid.src = blobUrl;
-    vid.muted = true;
-    vid.preload = "metadata";
-    vid.addEventListener("loadedmetadata", () => {
-      vid.currentTime = 0.5;
-    });
-    thumb.appendChild(vid);
+    previewImg.style.display = "none";
   }
 
-  const rm = document.createElement("button");
-  rm.type = "button";
-  rm.className = "preview-remove";
-  rm.textContent = "×";
-  rm.setAttribute("aria-label", "Remove file");
-  rm.addEventListener("click", () => {
-    strip.innerHTML = "";
-    strip.classList.remove("has-file");
-    mmFile = null;
-    mmFileType = null;
-    const inputEl = document.getElementById(
-      type === "image" ? "imgInput" : "vidInput",
-    );
-    if (inputEl) inputEl.value = "";
-    mmUpdateStatus();
-  });
-  thumb.appendChild(rm);
-
-  const meta = document.createElement("div");
-  meta.className = "preview-meta";
-  meta.innerHTML = `<div class="preview-name">${file.name}</div><div class="preview-size">${sizeStr}</div>`;
-
-  strip.innerHTML = "";
-  strip.appendChild(thumb);
-  strip.appendChild(meta);
-  strip.classList.add("has-file");
-  mmUpdateStatus();
+  bar.style.display = "flex";
 }
 
-function mmUpdateStatus() {
-  const pill = document.getElementById("mmStatusPill");
-  const label = document.getElementById("mmStatusLabel");
-  const count = document.getElementById("mmCharCount");
-  if (!pill) return;
-  count.textContent = "";
+function clearFile() {
+  pendingFile = pendingFileType = pendingFileB64 = null;
+  document.getElementById("filePreviewBar").style.display = "none";
+  document.getElementById("fileInput").value = "";
+  document.getElementById("filePreviewImg").style.display = "none";
+}
 
-  switch (mmCurrentTab) {
-    case "text": {
-      const val = textArea ? textArea.value.trim() : "";
-      if (val.length > 10) {
-        pill.className = "status-pill ready";
-        label.textContent = "Text ready";
-        count.textContent = textArea.value.length + " chars";
-      } else {
-        pill.className = "status-pill";
-        label.textContent = "Waiting for content";
-      }
-      break;
-    }
-    case "image":
-    case "video": {
-      if (mmFile) {
-        pill.className = "status-pill ready";
-        label.textContent =
-          mmFileType === "image" ? "Image ready" : "Video ready";
-      } else {
-        pill.className = "status-pill";
-        label.textContent = "Waiting for file";
-      }
-      break;
-    }
-    case "url": {
-      const val = urlInput ? urlInput.value.trim() : "";
-      try {
-        new URL(val);
-        pill.className = "status-pill ready";
-        label.textContent = "URL valid";
-      } catch {
-        pill.className = val.length ? "status-pill invalid" : "status-pill";
-        label.textContent = val.length ? "Invalid URL" : "Waiting for URL";
-      }
-      break;
-    }
+/* ══════════════════════════════════════════
+   INPUT HELPERS
+══════════════════════════════════════════ */
+function autoResize(el) {
+  el.style.height = "auto";
+  el.style.height = Math.min(el.scrollHeight, 160) + "px";
+}
+
+function handleKey(e) {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
   }
 }
 
-function mmGetContent() {
-  switch (mmCurrentTab) {
-    case "text":
-      return { type: "text", value: textArea ? textArea.value.trim() : "" };
-    case "image":
-    case "video":
-      return { type: mmFileType, file: mmFile };
-    case "url":
-      return { type: "url", value: urlInput ? urlInput.value.trim() : "" };
+/* ══════════════════════════════════════════
+   CHAT UI HELPERS
+══════════════════════════════════════════ */
+function appendUserMsg(text, mediaData) {
+  const win = document.getElementById("chatWindow");
+  const msg = document.createElement("div");
+  msg.className = "chat-msg user";
+  let inner = "";
+
+  if (mediaData) {
+    if (mediaData.type === "image") {
+      inner += `<div class="user-img-preview"><img src="${mediaData.url}" alt="uploaded"/></div>`;
+    } else if (mediaData.type === "video") {
+      inner += `<div class="user-video-preview"><video controls src="${mediaData.url}" style="max-width: 200px; border-radius: 8px;"></video></div>`;
+    }
   }
+
+  if (text) {
+    inner += `<div class="msg-bubble user-bubble">${escapeHtml(text)}</div>`;
+  }
+
+  msg.innerHTML = inner;
+  win.appendChild(msg);
+  win.scrollTop = win.scrollHeight;
+}
+
+function appendTyping() {
+  const win = document.getElementById("chatWindow");
+  const msg = document.createElement("div");
+  msg.className = "chat-msg bot";
+  msg.id = "typingMsg";
+  msg.innerHTML = `
+    <div class="bot-avatar">${BOT_AVATAR_SVG}</div>
+    <div class="msg-bubble typing"><span></span><span></span><span></span></div>
+  `;
+  win.appendChild(msg);
+  win.scrollTop = win.scrollHeight;
+}
+
+function removeTyping() {
+  document.getElementById("typingMsg")?.remove();
+}
+
+/* ── Verdict texts in multiple languages ── */
+function getVerdictText(verdict, confidence, lang) {
+  const texts = {
+    verified: {
+      tun:
+        confidence >= 75
+          ? "✅ not fake bro — vérifié !"
+          : "✅ mrgll mais reste vigilant",
+
+      fr:
+        confidence >= 75
+          ? "✅ Vérifié — c'est vrai !"
+          : "✅ Plutôt vrai — mais reste vigilant",
+      en:
+        confidence >= 75
+          ? "✅ Verified — it's true!"
+          : "✅ Likely true — but stay vigilant",
+    },
+    suspicious: {
+      tun:
+        confidence >= 60
+          ? "⚠️ Zaama… méfie-toi bro"
+          : "⚠️ yodhhorli katous f chkara hehe — suspect",
+
+      fr: confidence >= 60 ? "⚠️ Zaama… méfie-toi" : "⚠️ Pas clair — suspect",
+      en:
+        confidence >= 60
+          ? "⚠️ Suspicious… be careful"
+          : "⚠️ Unclear — suspicious",
+    },
+    misleading: {
+      tun: "🔴 Katous fil chkara belhak — Misleading !",
+
+      fr: "🔴 Complètement trompeur — Fake news !",
+      en: "🔴 Completely misleading — Fake news!",
+    },
+    unknown: {
+      tun: "🤔 Ma3raftech — résultat inconnu",
+
+      fr: "🤔 Je ne sais pas — résultat inconnu",
+      en: "🤔 Unknown — can't determine",
+    },
+  };
+  return texts[verdict]?.[lang] || texts[verdict]?.en || verdict;
+}
+
+function getAuthText(authVerdict, lang) {
+  const texts = {
+    authentic: {
+      tun: "✅ Contenu authentique",
+
+      fr: "✅ Contenu authentique",
+      en: "✅ Authentic content",
+    },
+    likely_ai: {
+      tun: "🤮 rod belek générée par IA",
+
+      fr: "🤮 Probablement généré par IA",
+      en: "🤮 Likely AI-generated",
+    },
+    manipulated: {
+      tun: "✂️ Contenu manipulé",
+
+      fr: "✂️ Contenu manipulé",
+      en: "✂️ Manipulated content",
+    },
+  };
+  return texts[authVerdict]?.[lang] || texts[authVerdict]?.en || authVerdict;
+}
+
+function getSourceText(sVerdict, lang) {
+  const texts = {
+    trusted: {
+      tun: "✅ jawek behi Source fiable",
+
+      fr: "✅ Source fiable",
+      en: "✅ Trusted source",
+    },
+    suspicious: {
+      tun: "⚠️ Source suspecte — watch out",
+
+      fr: "⚠️ Source suspecte — méfie-toi",
+      en: "⚠️ Suspicious source — beware",
+    },
+    unknown: {
+      tun: "❓ Source inconnue",
+
+      fr: "❓ Source inconnue",
+      en: "❓ Unknown source",
+    },
+  };
+  return texts[sVerdict]?.[lang] || texts[sVerdict]?.en || sVerdict;
+}
+
+function appendBotResult(data) {
+  const win = document.getElementById("chatWindow");
+  const msg = document.createElement("div");
+  msg.className = "chat-msg bot";
+
+  const verdict = (data.verdict || "unknown").toLowerCase();
+  const confidence = parseInt(data.confidence ?? 0);
+  const authV = (data.authenticity_verdict || "").toLowerCase();
+  const sVerdict = (data.source_verdict || "unknown").toLowerCase();
+  const sScore = parseInt(data.source_score ?? 0);
+  const authScore = parseInt(data.authenticity_score ?? 0);
+  const lang = currentLanguage;
+
+  const allFlags = [
+    ...(data.authenticity_flags || []),
+    ...(data.flags || []),
+    ...(data.source_flags || []),
+  ];
+
+  const flagsHtml = allFlags.length
+    ? `<div class="result-flags">${allFlags.map((f) => `<span class="flag-tag">${escapeHtml(f)}</span>`).join("")}</div>`
+    : "";
+
+  const uid = Date.now();
+
+  msg.innerHTML = `
+    <div class="bot-avatar">${BOT_AVATAR_SVG}</div>
+    <div class="msg-bubble result-bubble ${verdict}">
+
+      <div class="result-top">
+        <span class="result-verdict">${getVerdictText(verdict, confidence, lang)}</span>
+        <span class="result-score-badge">${confidence}%</span>
+      </div>
+      <div class="score-bar-wrap">
+        <div class="score-bar" id="bar-main-${uid}" data-score="${confidence}"></div>
+      </div>
+      <p class="result-expl">${escapeHtml(data.explanation || "—")}</p>
+
+      ${flagsHtml}
+
+      ${
+        authV
+          ? `
+      <div class="axe-mini axe1-mini">
+        <div class="axe-mini-header">
+          <span class="axe-label">Axe 1 · Authenticité</span>
+          <span class="axe-score">${authScore}%</span>
+        </div>
+        <div class="score-bar-wrap">
+          <div class="score-bar axe1-bar" id="bar-axe1-${uid}" data-score="${authScore}"></div>
+        </div>
+        <span class="axe-verdict-text">${getAuthText(authV, lang)}</span>
+        <p class="axe-expl">${escapeHtml(data.authenticity_explanation || "—")}</p>
+      </div>`
+          : ""
+      }
+
+      <div class="axe-mini axe3-mini">
+        <div class="axe-mini-header">
+          <span class="axe-label">Axe 3 · Crédibilité source</span>
+          <span class="axe-score">${sScore}%</span>
+        </div>
+        <div class="score-bar-wrap">
+          <div class="score-bar axe3-bar" id="bar-axe3-${uid}" data-score="${sScore}"></div>
+        </div>
+        <span class="source-badge ${sVerdict}">${getSourceText(sVerdict, lang)}</span>
+        <p class="axe-expl">${escapeHtml(data.source_explanation || "—")}</p>
+      </div>
+
+      <button class="new-analysis-btn" onclick="resetChat()">← ${lang === "tun" ? "حلل حاجة أخرى" : lang === "ar" ? "حلل شيئًا آخر" : lang === "fr" ? "Analyser autre chose" : "Analyze something else"}</button>
+    </div>
+  `;
+
+  win.appendChild(msg);
+  win.scrollTop = win.scrollHeight;
+
+  setTimeout(() => {
+    const setBar = (id, score) => {
+      const bar = document.getElementById(id);
+      if (!bar) return;
+      const color =
+        score >= 70
+          ? "var(--verified)"
+          : score >= 40
+            ? "var(--suspicious)"
+            : "var(--misleading)";
+      bar.style.width = score + "%";
+      bar.style.background = color;
+    };
+    setBar(`bar-main-${uid}`, confidence);
+    setBar(`bar-axe1-${uid}`, authScore);
+    setBar(`bar-axe3-${uid}`, sScore);
+  }, 100);
+}
+
+function appendBotError(text) {
+  const win = document.getElementById("chatWindow");
+  const msg = document.createElement("div");
+  msg.className = "chat-msg bot";
+  msg.innerHTML = `
+    <div class="bot-avatar">${BOT_AVATAR_SVG}</div>
+    <div class="msg-bubble error-bubble">⚠️ ${escapeHtml(text)}<br><small>Réessaie dans quelques secondes.</small></div>
+  `;
+  win.appendChild(msg);
+  win.scrollTop = win.scrollHeight;
+}
+
+function resetChat() {
+  const input = document.getElementById("chatInput");
+  input.value = "";
+  autoResize(input);
+  clearFile();
+  const win = document.getElementById("chatWindow");
+  win.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function escapeHtml(str) {
+  return (str || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
 
 /* ══════════════════════════════════════════
    SYSTEM PROMPTS
 ══════════════════════════════════════════ */
 
-const SYSTEM_PROMPT_AXE1 = `You are an expert in digital content authenticity and AI-generated content detection.
-Analyze the provided content (text, image, or video frame) for signs of:
-- AI-generated text (unnatural fluency, lack of specific details, hedging language, generic phrasing)
-- Image manipulation (inconsistent lighting, artifacts, unnatural edges, cloning artifacts)
-- Deepfake indicators (facial inconsistencies, unnatural blinking, hair/teeth artifacts)
-- Recycled or copy-pasted content reused in a misleading new context
+const SYSTEM_EXTRACT = `You are a message parser. Extract the main content/claim, any caption or headline, and any URL from the user's message.
+Respond ONLY with a valid JSON object, no preamble, no markdown:
+{
+  "content": "<the main text or claim to verify>",
+  "caption": "<headline or caption if present, else empty string>",
+  "url": "<URL if present, else empty string>"
+}`;
 
-Always respond with ONLY a valid JSON object — no preamble, no markdown fences — in exactly this shape:
+const SYSTEM_AXE1 = `You are an expert in digital content authenticity and AI-generated content detection.
+Analyze the provided content for signs of:
+- AI-generated text (unnatural fluency, lack of specific details, generic phrasing)
+- Image manipulation (inconsistent lighting, artifacts, cloning)
+- Deepfake indicators (facial inconsistencies, unnatural features)
+- Recycled content used in a misleading new context
+
+Respond ONLY with a valid JSON object, no preamble, no markdown:
 {
   "authenticity_verdict": "authentic" | "likely_ai" | "manipulated",
   "authenticity_score": <integer 0-100>,
   "authenticity_explanation": "<2-3 sentence analysis>",
-  "authenticity_flags": ["<short flag>", ...]
+  "authenticity_flags": ["<short flag>"]
 }`;
 
-const SYSTEM_PROMPT_AXE2 = `You are an expert fact-checker and contextual consistency analyst.
-Given a piece of content (text, image, video frame, or URL), analyze whether it is contextually accurate, potentially misleading, or verifiably false.
-
-Always respond with ONLY a valid JSON object — no preamble, no markdown fences — in exactly this shape:
+const SYSTEM_AXE2 = `You are an expert fact-checker and contextual consistency analyst.
+Analyze whether the content is contextually accurate, potentially misleading, or verifiably false.
+Respond ONLY with a valid JSON object, no preamble, no markdown:
 {
   "verdict": "verified" | "suspicious" | "misleading",
   "confidence": <integer 0-100>,
   "explanation": "<2-4 sentence analysis>",
-  "flags": ["<short flag>", ...]
+  "flags": ["<short flag>"]
 }`;
 
-const SYSTEM_PROMPT_AXE3 = `You are an expert in source credibility analysis.
-Analyze the provided source URL and context for trustworthiness signals.
-Look for: suspicious domain patterns, spoofed legitimate sites, clickbait URLs, very new domains, misleading subdomains, writing style inconsistencies.
-
-Always respond with ONLY a valid JSON object — no preamble, no markdown fences — in exactly this shape:
+const SYSTEM_AXE3 = `You are an expert in source credibility analysis.
+Analyze the source URL for trustworthiness. Look for suspicious domains, clickbait patterns, spoofed sites, new domains.
+Respond ONLY with a valid JSON object, no preamble, no markdown:
 {
   "source_verdict": "trusted" | "suspicious" | "unknown",
   "source_score": <integer 0-100>,
-  "source_explanation": "<2-3 sentence analysis>",
-  "source_flags": ["<short flag>", ...]
+  "source_explanation": "<1-2 sentence analysis>",
+  "source_flags": ["<short flag>"]
 }`;
 
 /* ══════════════════════════════════════════
-   PROMPT BUILDERS
+   API HELPER
 ══════════════════════════════════════════ */
-
-function buildPromptAxe2({
-  text,
-  url,
-  caption,
-  sourceUrl,
-  isImage,
-  isVideo,
-  videoName,
-}) {
-  let parts = [];
-  if (isImage)
-    parts.push(
-      "Analyze the image provided for contextual consistency and potential misinformation.",
-    );
-  else if (isVideo)
-    parts.push(
-      `Analyze this video frame from "${videoName}" for contextual consistency and potential misinformation.`,
-    );
-  else if (url)
-    parts.push(
-      `The content comes from this URL: ${url}\nAnalyze the URL structure and any contextual signals you can infer.`,
-    );
-  else if (text) parts.push(`Analyze the following content:\n\n${text}`);
-  if (caption) parts.push(`\nClaimed title/caption: "${caption}"`);
-  if (sourceUrl) parts.push(`Source URL: ${sourceUrl}`);
-  parts.push("\nReturn only the JSON verdict object.");
-  return parts.join("\n");
-}
-
-function buildPromptAxe3({ sourceUrl, caption }) {
-  let parts = [];
-  if (sourceUrl) {
-    parts.push(`Analyze this source URL for credibility:\n${sourceUrl}`);
-    parts.push(
-      `Check for: suspicious domain name, recently created domains, spoofed legitimate sites, clickbait patterns.`,
-    );
-  } else {
-    parts.push(`No source URL was provided.`);
-    parts.push(
-      `Analyze the writing style and credibility signals from this caption: "${caption}"`,
-    );
-  }
-  parts.push("\nReturn only the JSON verdict object.");
-  return parts.join("\n");
+async function callAPI(systemPrompt, userContent) {
+  const res = await fetch("http://localhost:3000/analyze", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ systemPrompt, userContent }),
+  });
+  if (!res.ok) throw new Error("Erreur serveur " + res.status);
+  const data = await res.json();
+  const raw = (data.result || "{}").replace(/```json|```/gi, "").trim();
+  return JSON.parse(raw);
 }
 
 /* ══════════════════════════════════════════
-   FORM + UI
+   FILE UTILITIES
 ══════════════════════════════════════════ */
-
-const form = document.getElementById("analyzeForm");
-const submitBtn = document.getElementById("submitBtn");
-const resultSec = document.getElementById("resultSection");
-const consoleSec = document.getElementById("consoleSection");
-const consoleEl = document.getElementById("consoleBody");
-
-function clog(msg) {
-  consoleSec.hidden = false;
-  consoleEl.textContent += msg + "\n";
-  consoleEl.scrollTop = consoleEl.scrollHeight;
-}
-
-function setLoading(on) {
-  submitBtn.disabled = on;
-  submitBtn.querySelector(".btn-text").hidden = on;
-  submitBtn.querySelector(".btn-arrow").hidden = on;
-  submitBtn.querySelector(".btn-loader").hidden = !on;
-}
-
-function showGlobalVerdict(verdict, combinedScore) {
-  const gv = document.getElementById("globalVerdict");
-  const gi = document.getElementById("globalIcon");
-  const gt = document.getElementById("globalText");
-  const gs = document.getElementById("globalScore");
-  if (!gv) return;
-  const icons = { verified: "✓", suspicious: "⚠", misleading: "✗" };
-  const texts = {
-    verified: "Content appears trustworthy",
-    suspicious: "Content requires verification",
-    misleading: "Content is likely misleading",
-  };
-  gv.hidden = false;
-  gv.className = "global-verdict " + verdict;
-  gi.textContent = icons[verdict] || "?";
-  gt.textContent = texts[verdict] || "Unknown";
-  gs.textContent = combinedScore + "%";
-}
-
-function renderFlags(containerId, flags) {
-  const el = document.getElementById(containerId);
-  if (!el) return;
-  el.innerHTML = "";
-  (Array.isArray(flags) ? flags : []).forEach((f) => {
-    const span = document.createElement("span");
-    span.className = "flag-tag";
-    span.textContent = f;
-    el.appendChild(span);
-  });
-}
-
-function animateBar(barId, score) {
-  const bar = document.getElementById(barId);
-  if (!bar) return;
-  const color =
-    score >= 70
-      ? "var(--verified)"
-      : score >= 40
-        ? "var(--suspicious)"
-        : "var(--misleading)";
-  setTimeout(() => {
-    bar.style.width = score + "%";
-    bar.style.background = color;
-  }, 50);
-}
-
-function showResult(data) {
-  resultSec.hidden = false;
-
-  /* ── Axe 1 ── */
-  const axe1Card = document.getElementById("axe1Result");
-  if (axe1Card && data.authenticity_verdict) {
-    axe1Card.hidden = false;
-    const aVerdict = (data.authenticity_verdict || "unknown").toLowerCase();
-    const axe1Class =
-      aVerdict === "authentic"
-        ? "verified"
-        : aVerdict === "likely_ai"
-          ? "suspicious"
-          : aVerdict === "manipulated"
-            ? "misleading"
-            : "unknown";
-    document.getElementById("axe1Dot").className = "status-dot " + axe1Class;
-    document.getElementById("axe1Verdict").textContent = aVerdict
-      .replace(/_/g, " ")
-      .replace(/\b\w/g, (c) => c.toUpperCase());
-    document.getElementById("axe1Score").textContent =
-      (data.authenticity_score ?? 0) + "%";
-    document.getElementById("axe1Explanation").textContent =
-      data.authenticity_explanation || "—";
-    renderFlags("axe1Flags", data.authenticity_flags);
-    animateBar("axe1Bar", data.authenticity_score ?? 0);
-  }
-
-  /* ── Axe 2 ── */
-  const verdict = (data.verdict || "unknown").toLowerCase();
-  const confidence = parseInt(data.confidence ?? 0);
-  document.getElementById("statusDot").className = "status-dot " + verdict;
-  document.getElementById("statusText").textContent =
-    verdict.charAt(0).toUpperCase() + verdict.slice(1);
-  document.getElementById("scoreValue").textContent = confidence + "%";
-  document.getElementById("resultExplanation").textContent =
-    data.explanation || "—";
-  renderFlags("resultFlags", data.flags);
-  animateBar("scoreBar", confidence);
-
-  /* ── Axe 3 ── */
-  const sourceCard = document.getElementById("sourceResult");
-  if (sourceCard && data.source_verdict) {
-    sourceCard.hidden = false;
-    const sVerdict = (data.source_verdict || "unknown").toLowerCase();
-    document.getElementById("sourceDot").className = "status-dot " + sVerdict;
-    document.getElementById("sourceVerdict").textContent =
-      sVerdict.charAt(0).toUpperCase() + sVerdict.slice(1);
-    document.getElementById("sourceScore").textContent =
-      (data.source_score ?? 0) + "%";
-    document.getElementById("sourceExplanation").textContent =
-      data.source_explanation || "—";
-    renderFlags("sourceFlags", data.source_flags);
-    animateBar("sourceBar", data.source_score ?? 0);
-  }
-
-  document.getElementById("resultRaw").textContent = JSON.stringify(
-    data,
-    null,
-    2,
-  );
-  showGlobalVerdict(verdict, confidence);
-  const resetBtn = document.getElementById("analyzeAnotherBtn");
-  if (resetBtn) resetBtn.hidden = false;
-  resultSec.scrollIntoView({ behavior: "smooth", block: "start" });
-}
-
-function resetAll() {
-  document.getElementById("resultSection").hidden = true;
-  document.getElementById("consoleSection").hidden = true;
-  document.getElementById("analyzeAnotherBtn").hidden = true;
-  const gv = document.getElementById("globalVerdict");
-  if (gv) gv.hidden = true;
-  ["sourceResult", "axe1Result"].forEach((id) => {
-    const el = document.getElementById(id);
-    if (el) el.hidden = true;
-  });
-  document.getElementById("contentText").value = "";
-  document.getElementById("caption").value = "";
-  document.getElementById("sourceUrl").value = "";
-  ["previewImage", "previewVideo"].forEach((id) => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.innerHTML = "";
-      el.classList.remove("has-file");
-    }
-  });
-  ["imgInput", "vidInput"].forEach((id) => {
-    const el = document.getElementById(id);
-    if (el) el.value = "";
-  });
-  mmFile = null;
-  mmFileType = null;
-  consoleEl.textContent = "";
-  switchTab("text");
-  mmUpdateStatus();
-  window.scrollTo({ top: 0, behavior: "smooth" });
-}
-
-document.getElementById("rawToggle")?.addEventListener("click", () => {
-  const raw = document.getElementById("resultRaw");
-  const arrow = document.querySelector(".toggle-arrow");
-  raw.hidden = !raw.hidden;
-  arrow.classList.toggle("open", !raw.hidden);
-});
-
-/* ══════════════════════════════════════════
-   SUBMIT — Axe 1 + Axe 2 + Axe 3 in parallel
-══════════════════════════════════════════ */
-
-form?.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  consoleEl.textContent = "";
-
-  const content = mmGetContent();
-  const caption = document.getElementById("caption")?.value.trim() || "";
-  const sourceUrl = document.getElementById("sourceUrl")?.value.trim() || "";
-
-  if (content.type === "text" && !content.value) {
-    clog("[error] No text content provided.");
-    return;
-  }
-  if ((content.type === "image" || content.type === "video") && !content.file) {
-    clog("[error] No file selected.");
-    return;
-  }
-  if (content.type === "url" && !content.value) {
-    clog("[error] No URL provided.");
-    return;
-  }
-
-  setLoading(true);
-  clog("[info] Building request…");
-
-  try {
-    let userContentAxe2 = [];
-
-    if (content.type === "text") {
-      clog("[info] Mode: text");
-      userContentAxe2.push({
-        type: "text",
-        text: buildPromptAxe2({ text: content.value, caption, sourceUrl }),
-      });
-    } else if (content.type === "url") {
-      /* ✅ Real URL scraping */
-      clog("[info] Mode: URL → " + content.value + " (fetching real content…)");
-      let scrapedText = "";
-      let scrapedTitle = "";
-      try {
-        const fetchRes = await fetch("http://localhost:3000/fetch-url", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url: content.value }),
-        });
-        if (fetchRes.ok) {
-          const scraped = await fetchRes.json();
-          scrapedTitle = scraped.ogTitle || scraped.title || "";
-          scrapedText = [
-            scraped.ogTitle || scraped.title,
-            scraped.ogDesc || scraped.description,
-            scraped.bodyText,
-          ]
-            .filter(Boolean)
-            .join("\n\n");
-          clog("[info] Scraped " + scrapedText.length + " chars from URL");
-        } else {
-          clog(
-            "[warn] Could not scrape URL — falling back to URL-only analysis",
-          );
-        }
-      } catch (err) {
-        clog("[warn] Scrape error: " + err.message + " — falling back");
-      }
-      userContentAxe2.push({
-        type: "text",
-        text: buildPromptAxe2({
-          text: scrapedText || null,
-          url: scrapedText ? null : content.value,
-          caption: caption || scrapedTitle,
-          sourceUrl: content.value,
-        }),
-      });
-    } else if (content.type === "image") {
-      /* ✅ Image */
-      clog("[info] Mode: image → " + content.file.name);
-      const b64 = await fileToBase64(content.file);
-      userContentAxe2.push({
-        type: "image",
-        source: {
-          type: "base64",
-          media_type: content.file.type || "image/jpeg",
-          data: b64,
-        },
-      });
-      userContentAxe2.push({
-        type: "text",
-        text: buildPromptAxe2({ caption, sourceUrl, isImage: true }),
-      });
-    } else if (content.type === "video") {
-      /* ✅ Video */
-      clog(
-        "[info] Mode: video → " + content.file.name + " (extracting frame…)",
-      );
-      const b64 = await videoFrame(content.file);
-      userContentAxe2.push({
-        type: "image",
-        source: { type: "base64", media_type: "image/jpeg", data: b64 },
-      });
-      userContentAxe2.push({
-        type: "text",
-        text: buildPromptAxe2({
-          caption,
-          sourceUrl,
-          isVideo: true,
-          videoName: content.file.name,
-        }),
-      });
-    }
-
-    clog("[info] Launching Axe 1 + Axe 2 + Axe 3 in parallel…");
-
-    /* ✅ 3 parallel calls */
-    const [response2, response3, response1] = await Promise.all([
-      fetch("http://localhost:3000/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          systemPrompt: SYSTEM_PROMPT_AXE2,
-          userContent: userContentAxe2,
-        }),
-      }),
-      fetch("http://localhost:3000/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          systemPrompt: SYSTEM_PROMPT_AXE3,
-          userContent: [
-            { type: "text", text: buildPromptAxe3({ sourceUrl, caption }) },
-          ],
-        }),
-      }),
-      fetch("http://localhost:3000/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          systemPrompt: SYSTEM_PROMPT_AXE1,
-          userContent: userContentAxe2,
-        }),
-      }),
-    ]);
-
-    if (!response2.ok) {
-      clog("[error] Axe 2 failed: " + response2.status);
-      setLoading(false);
-      return;
-    }
-    if (!response3.ok) {
-      clog("[error] Axe 3 failed: " + response3.status);
-      setLoading(false);
-      return;
-    }
-
-    const data2 = await response2.json();
-    const data3 = await response3.json();
-    const result2 = JSON.parse(
-      (data2.result || "{}").replace(/```json|```/gi, "").trim(),
-    );
-    const result3 = JSON.parse(
-      (data3.result || "{}").replace(/```json|```/gi, "").trim(),
-    );
-    clog("[axe2 raw] " + JSON.stringify(result2));
-    clog("[axe3 raw] " + JSON.stringify(result3));
-
-    /* Axe 1 non-blocking */
-    let result1 = {
-      authenticity_verdict: "authentic",
-      authenticity_score: 50,
-      authenticity_explanation: "Authenticity analysis unavailable.",
-      authenticity_flags: [],
-    };
-    try {
-      const data1 = await response1.json();
-      const raw1 = (data1.result || "{}").replace(/```json|```/gi, "").trim();
-      result1 = JSON.parse(raw1);
-      clog("[axe1 raw] " + JSON.stringify(result1));
-    } catch (e) {
-      clog("[warn] Axe 1 parse failed — using fallback");
-    }
-
-    /* ✅ Combined score: Axe1=20%, Axe2=50%, Axe3=30% */
-    const combinedScore = Math.round(
-      (result1.authenticity_score ?? 50) * 0.2 +
-        result2.confidence * 0.5 +
-        result3.source_score * 0.3,
-    );
-
-    clog(
-      "[info] Axe1 authenticity: " +
-        result1.authenticity_verdict +
-        " (" +
-        (result1.authenticity_score ?? 0) +
-        "%)",
-    );
-    clog(
-      "[info] Axe2 consistency:  " +
-        result2.verdict +
-        " (" +
-        result2.confidence +
-        "%)",
-    );
-    clog(
-      "[info] Axe3 credibility:  " +
-        result3.source_verdict +
-        " (" +
-        result3.source_score +
-        "%)",
-    );
-    clog("[info] Combined score:    " + combinedScore + "%");
-
-    showResult({
-      authenticity_verdict: result1.authenticity_verdict,
-      authenticity_score: result1.authenticity_score,
-      authenticity_explanation: result1.authenticity_explanation,
-      authenticity_flags: result1.authenticity_flags,
-      verdict: result2.verdict,
-      confidence: combinedScore,
-      explanation: result2.explanation,
-      flags: [
-        ...(result1.authenticity_flags || []),
-        ...(result2.flags || []),
-        ...(result3.source_flags || []),
-      ],
-      source_verdict: result3.source_verdict,
-      source_score: result3.source_score,
-      source_explanation: result3.source_explanation,
-      source_flags: result3.source_flags,
-    });
-  } catch (err) {
-    clog("[error] " + err.message);
-  } finally {
-    setLoading(false);
-  }
-});
-
-/* ══════════════════════════════════════════
-   UTILITIES
-══════════════════════════════════════════ */
-
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -770,9 +471,158 @@ function videoFrame(file) {
     });
     video.addEventListener("error", () => {
       URL.revokeObjectURL(url);
-      reject(new Error("Could not load video"));
+      reject(new Error("Video error"));
     });
   });
 }
 
-mmUpdateStatus();
+/* ══════════════════════════════════════════
+   MAIN SEND FUNCTION
+══════════════════════════════════════════ */
+async function sendMessage() {
+  const input = document.getElementById("chatInput");
+  const sendBtn = document.getElementById("sendBtn");
+  const text = input.value.trim();
+
+  if (!text && !pendingFile) return;
+
+  // Detect language from user's message
+  if (text) {
+    currentLanguage = detectLanguage(text);
+  }
+
+  // Show user message with media preview
+  let mediaData = null;
+  if (pendingFile && pendingFileType === "image") {
+    mediaData = { type: "image", url: URL.createObjectURL(pendingFile) };
+  } else if (pendingFile && pendingFileType === "video") {
+    mediaData = { type: "video", url: URL.createObjectURL(pendingFile) };
+  }
+  appendUserMsg(text, mediaData);
+
+  // Reset input
+  input.value = "";
+  input.style.height = "auto";
+  sendBtn.disabled = true;
+
+  const localFile = pendingFile;
+  const localFileType = pendingFileType;
+  clearFile();
+
+  appendTyping();
+
+  try {
+    // Step 1: Extract content/caption/URL from message
+    let extractedContent = text;
+    let extractedCaption = "";
+    let extractedUrl = "";
+
+    if (text) {
+      try {
+        const ex = await callAPI(SYSTEM_EXTRACT, [{ type: "text", text }]);
+        extractedContent = ex.content || text;
+        extractedCaption = ex.caption || "";
+        extractedUrl = ex.url || "";
+      } catch {
+        // fallback
+      }
+    }
+
+    // Step 2: Fetch URL content if present
+    let scrapedData = null;
+    if (extractedUrl) {
+      try {
+        const fetchRes = await fetch("http://localhost:3000/fetch-url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: extractedUrl }),
+        });
+        if (fetchRes.ok) {
+          scrapedData = await fetchRes.json();
+          if (!extractedCaption && scrapedData.title) {
+            extractedCaption = scrapedData.title;
+          }
+        }
+      } catch {
+        // non-blocking
+      }
+    }
+
+    // Step 3: Build userContent with full context (source + content + caption)
+    let userContentMain = [];
+    let contentText = "";
+
+    if (scrapedData) {
+      contentText = `Title: ${scrapedData.title || ""}\nDescription: ${scrapedData.description || ""}\nBody: ${scrapedData.bodyText || ""}\nUser caption: ${extractedCaption || ""}\nUser claim: ${extractedContent || ""}`;
+    } else {
+      contentText = `Content: ${extractedContent}\nCaption: ${extractedCaption || ""}`;
+    }
+
+    if (localFile) {
+      const mediaType = localFile.type || "image/jpeg";
+      let b64;
+      if (localFileType === "video") {
+        b64 = await videoFrame(localFile);
+        userContentMain.push({
+          type: "image",
+          source: { type: "base64", media_type: "image/jpeg", data: b64 },
+        });
+      } else {
+        b64 = await fileToBase64(localFile);
+        userContentMain.push({
+          type: "image",
+          source: { type: "base64", media_type: mediaType, data: b64 },
+        });
+      }
+      userContentMain.push({ type: "text", text: contentText });
+    } else {
+      userContentMain.push({ type: "text", text: contentText });
+    }
+
+    // Axe3 content
+    const userContentAxe3 = [
+      {
+        type: "text",
+        text: extractedUrl
+          ? `Analyze this source URL for credibility:\n${extractedUrl}\nContext: "${extractedCaption || extractedContent}"\nReturn only the JSON verdict.`
+          : `No URL. Analyze credibility of this claim: "${extractedContent}"\nReturn only the JSON verdict.`,
+      },
+    ];
+
+    // Step 4: 3 parallel AI calls
+    const [result1, result2, result3] = await Promise.all([
+      callAPI(SYSTEM_AXE1, userContentMain),
+      callAPI(SYSTEM_AXE2, userContentMain),
+      callAPI(SYSTEM_AXE3, userContentAxe3),
+    ]);
+
+    // Step 5: Combined score
+    const combinedScore = Math.round(
+      (result1.authenticity_score ?? 50) * 0.2 +
+        (result2.confidence ?? 50) * 0.5 +
+        (result3.source_score ?? 50) * 0.3,
+    );
+
+    removeTyping();
+    appendBotResult({
+      authenticity_verdict: result1.authenticity_verdict,
+      authenticity_score: result1.authenticity_score,
+      authenticity_explanation: result1.authenticity_explanation,
+      authenticity_flags: result1.authenticity_flags,
+      verdict: result2.verdict,
+      confidence: combinedScore,
+      explanation: result2.explanation,
+      flags: result2.flags,
+      source_verdict: result3.source_verdict,
+      source_score: result3.source_score,
+      source_explanation: result3.source_explanation,
+      source_flags: result3.source_flags,
+    });
+  } catch (err) {
+    removeTyping();
+    appendBotError(err.message);
+  } finally {
+    sendBtn.disabled = false;
+    input.focus();
+  }
+}
