@@ -182,7 +182,6 @@ function updateTypingStep(stepIndex) {
    EXPLAINABILITY HELPERS
 ══════════════════════════════════════════ */
 
-/* Highlight clickbait words in text */
 const CLICKBAIT_WORDS = [
   "shocking",
   "exposed",
@@ -222,7 +221,6 @@ function highlightSuspiciousWords(text) {
   return result;
 }
 
-/* Build RAG cases HTML */
 function buildRagHtml(ragData) {
   if (!ragData || !ragData.similarCases || ragData.similarCases.length === 0)
     return "";
@@ -260,7 +258,6 @@ function buildRagHtml(ragData) {
     </div>`;
 }
 
-/* Build ML explanation HTML */
 function buildMlHtml(mlPredict, mlFeatures) {
   if (!mlPredict && !mlFeatures) return "";
 
@@ -314,12 +311,15 @@ function buildMlHtml(mlPredict, mlFeatures) {
   return html;
 }
 
-/* Build score breakdown HTML */
 function buildScoreBreakdown(axe1, axe2, axe3, combined) {
   const axes = [
-    { label: "Axe 1 · Authenticité (×20%)", score: axe1, weight: 20 },
-    { label: "Axe 2 · Consistance (×50%)", score: axe2, weight: 50 },
-    { label: "Axe 3 · Crédibilité (×30%)", score: axe3, weight: 30 },
+    { label: "Axe 1 · Vérité du contenu (×20%)", score: axe1, weight: 20 },
+    {
+      label: "Axe 2 · Consistance caption/image (×50%)",
+      score: axe2,
+      weight: 50,
+    },
+    { label: "Axe 3 · Crédibilité source (×30%)", score: axe3, weight: 30 },
   ];
 
   const rows = axes
@@ -344,7 +344,6 @@ function buildScoreBreakdown(axe1, axe2, axe3, combined) {
   </div>`;
 }
 
-/* Build ELA heatmap HTML */
 function buildElaHtml(elaData) {
   if (!elaData || !elaData.heatmap_base64) return "";
   const color =
@@ -419,15 +418,43 @@ function verdictLabel(verdict, confidence) {
   return "🤔 Ma3raftech — Unknown";
 }
 function authLabel(v) {
-  if (v === "authentic") return "✅ Contenu authentique";
-  if (v === "likely_ai") return "🤖 Yabi générée par IA";
-  if (v === "manipulated") return "✂️ Contenu manipulé";
+  if (v === "authentic") return "✅ Image authentique — caption correcte";
+  if (v === "likely_ai") return "🤖 Image générée par IA ou contenu suspect";
+  if (v === "manipulated")
+    return "✂️ Image réelle utilisée dans un faux contexte";
   return "❓ Authenticité inconnue";
 }
 function sourceLabel(v) {
   if (v === "trusted") return "✅ Source fiable";
   if (v === "suspicious") return "⚠️ Source suspecte — meftek";
   return "❓ Source inconnue";
+}
+
+/* ══════════════════════════════════════════
+   FIX 1 — axe2 score sémantiquement correct
+   Le LLM retourne "confidence" = certitude du verdict,
+   pas un score d'authenticité. Si verdict = misleading,
+   la consistance réelle est basse (= 100 - confidence).
+   Si verified, consistance = confidence.
+══════════════════════════════════════════ */
+function normalizeAxe2Score(verdict, llmConfidence) {
+  const c = parseInt(llmConfidence ?? 50);
+  if (verdict === "verified") return c; // haute consistance
+  if (verdict === "misleading") return 100 - c; // basse consistance
+  if (verdict === "suspicious") return Math.round(50 - (c - 50) * 0.5); // milieu
+  return 50;
+}
+
+/* ══════════════════════════════════════════
+   FIX 2 — verdict final cohérent avec le score
+   Le verdict vient de l'Axe 2 (LLM) mais le score
+   final combiné peut le contredire. On recalcule le
+   verdict à partir du score combiné pour cohérence.
+══════════════════════════════════════════ */
+function scoreToVerdict(score) {
+  if (score >= 70) return "verified";
+  if (score >= 40) return "suspicious";
+  return "misleading";
 }
 
 /* ══════════════════════════════════════════
@@ -447,7 +474,6 @@ function appendBotResult(data) {
   const axe2Score = parseInt(data.axe2_score ?? confidence);
   const uid = Date.now();
 
-  /* highlighted text */
   const highlightedText = data.original_text
     ? `<div class="highlighted-content">
         <div class="axe-label" style="margin-bottom:6px">📝 Contenu analysé — mots suspects surlignés</div>
@@ -455,16 +481,9 @@ function appendBotResult(data) {
        </div>`
     : "";
 
-  /* RAG block */
   const ragHtml = buildRagHtml(data.ragData);
-
-  /* ML explainability */
   const mlHtml = buildMlHtml(data.mlPredict, data.mlFeatures);
-
-  /* ELA heatmap */
   const elaHtml = buildElaHtml(data.elaData);
-
-  /* Score breakdown */
   const breakdownHtml = buildScoreBreakdown(
     authScore,
     axe2Score,
@@ -476,7 +495,6 @@ function appendBotResult(data) {
     <div class="bot-avatar">${BOT_AVATAR_SVG}</div>
     <div class="msg-bubble result-bubble ${verdict}">
 
-      <!-- VERDICT HEADER -->
       <div class="result-top">
         <span class="result-verdict">${verdictLabel(verdict, confidence)}</span>
         <span class="result-score-badge">${confidence}%</span>
@@ -486,28 +504,18 @@ function appendBotResult(data) {
       </div>
       <p class="result-expl">${escapeHtml(data.explanation || "—")}</p>
 
-      <!-- SCORE BREAKDOWN (explainable) -->
       ${breakdownHtml}
-
-      <!-- HIGHLIGHTED TEXT (explainable) -->
       ${highlightedText}
-
-      <!-- RAG SIMILAR CASES (explainable) -->
       ${ragHtml}
-
-      <!-- ML EXPLAINABILITY -->
       ${mlHtml}
-
-      <!-- ELA HEATMAP (if image) -->
       ${elaHtml}
 
-      <!-- AXE 1 -->
       ${
         authV
           ? `
       <div class="axe-mini axe1-mini">
         <div class="axe-mini-header">
-          <span class="axe-label">Axe 1 · Authenticité du contenu</span>
+          <span class="axe-label">Axe 1 · Vérité du contenu</span>
           <span class="axe-score">${authScore}%</span>
         </div>
         <div class="score-bar-wrap"><div class="score-bar axe1-bar" id="bar-axe1-${uid}"></div></div>
@@ -518,7 +526,6 @@ function appendBotResult(data) {
           : ""
       }
 
-      <!-- AXE 3 -->
       <div class="axe-mini axe3-mini">
         <div class="axe-mini-header">
           <span class="axe-label">Axe 3 · Crédibilité source</span>
@@ -536,7 +543,6 @@ function appendBotResult(data) {
   win.appendChild(msg);
   win.scrollTop = win.scrollHeight;
 
-  /* Animate bars */
   setTimeout(() => {
     const setBar = (id, score) => {
       const bar = document.getElementById(id);
@@ -553,7 +559,6 @@ function appendBotResult(data) {
     setBar(`bar-axe1-${uid}`, authScore);
     setBar(`bar-axe3-${uid}`, sScore);
 
-    /* Animate breakdown bars */
     document.querySelectorAll(".breakdown-bar").forEach((bar) => {
       const w = bar.style.width;
       bar.style.width = "0%";
@@ -610,13 +615,24 @@ Respond ONLY with valid JSON, no preamble:
 {"content":"<main text>","caption":"<headline if present else empty>","url":"<URL if present else empty>"}`;
 
 function buildAxe1Prompt(lang, mlContext, ragContext) {
-  return `You are an expert in digital content authenticity and AI-generated content detection.
+  return `You are an expert in digital content authenticity.
 
-Step-by-step analysis:
-1. Signs of AI-generated text? (unnatural fluency, generic phrasing, lack of specific details)
-2. Image/video manipulation signs?
-3. Recycled content in misleading context?
-4. Conclusion with confidence score.
+You must evaluate TWO separate things:
+A) IMAGE AUTHENTICITY: Is the image/media itself real or digitally manipulated/AI-generated?
+B) CONTENT TRUTHFULNESS: Does the caption/text accurately describe what is shown?
+
+Step-by-step:
+1. Is the image itself authentic (real photo, not AI-generated, not Photoshopped)?
+2. Is the text/caption truthful about what the image actually shows?
+3. If a real image is used with a FALSE caption → verdict is "manipulated" (context manipulation).
+4. If image itself is AI-generated or Photoshopped → verdict is "likely_ai" or "manipulated".
+5. Only if BOTH image is real AND caption is truthful → verdict "authentic".
+
+SCORING RULES (authenticity_score = overall content truthfulness score):
+- Real image + FALSE caption (wrong person, wrong event) → score 5-20, verdict "manipulated"
+- AI-generated image → score 20-40, verdict "likely_ai"  
+- Real image + true caption → score 75-100, verdict "authentic"
+- Uncertain → score 40-60, verdict "likely_ai"
 
 ${mlContext ? `[ML PRE-SCORE]: ${mlContext}\n` : ""}${ragContext ? `[RAG SIMILAR CASES]: ${ragContext}\n` : ""}
 Respond in ${lang}. ONLY valid JSON, no preamble:
@@ -632,6 +648,10 @@ Step-by-step:
 3. Does the caption/headline match the actual content?
 4. Is content used in a misleading context?
 5. Final verdict.
+
+IMPORTANT: "confidence" must reflect HOW CERTAIN you are of the verdict (0-100).
+If the content is clearly misleading, return verdict:"misleading" with high confidence (e.g. 90).
+If clearly verified, return verdict:"verified" with high confidence.
 
 ${mlContext ? `[ML PRE-SCORE]: ${mlContext}\n` : ""}${ragContext ? `[RAG SIMILAR CASES]: ${ragContext}\n` : ""}
 Respond in ${lang}. ONLY valid JSON, no preamble:
@@ -901,14 +921,12 @@ async function sendMessage() {
         source: { type: "base64", media_type: mediaType, data: b64 },
       });
 
-      /* Run ELA on first image */
       if (!firstImageB64 && item.type === "image") {
         firstImageB64 = `data:${mediaType};base64,${b64}`;
         firstImageType = mediaType;
       }
     }
 
-    /* Call ELA if we have an image */
     if (firstImageB64) {
       elaData = await callELA(firstImageB64, firstImageType);
       if (elaData && mlContextText !== null) {
@@ -916,7 +934,6 @@ async function sendMessage() {
       }
     }
 
-    /* Build text context */
     const contentForAnalysis =
       scrapedContent || extractedContent || "(no text provided)";
     const contextParts = [];
@@ -952,6 +969,12 @@ async function sendMessage() {
       callAPI(buildAxe3Prompt(lang, mlFeatures, ragContext), userContentAxe3),
     ]);
 
+    /* ── FIX: Axe2 score = consistance sémantique, pas confiance brute ── */
+    const axe2LLMScore = normalizeAxe2Score(
+      result2.verdict,
+      result2.confidence,
+    );
+
     /* ── Combine scores: ML×40% + LLM×60% ── */
     const mlAuth = mlPredict ? mlPredict.ml_score : null;
     const mlSrcScore = mlFeatures ? mlFeatures.source_score : null;
@@ -961,7 +984,6 @@ async function sendMessage() {
       result1.authenticity_score ?? 50,
       0.4,
     );
-    const axe2Score = result2.confidence ?? 50;
     const axe3Combined = combineScores(
       mlSrcScore,
       result3.source_score ?? 50,
@@ -975,17 +997,19 @@ async function sendMessage() {
 
     /* Global: Axe1×20% + Axe2×50% + Axe3×30% */
     const combinedScore = Math.round(
-      axe1Final * 0.2 + axe2Score * 0.5 + axe3Combined * 0.3,
+      axe1Final * 0.2 + axe2LLMScore * 0.5 + axe3Combined * 0.3,
     );
+
+    /* ── FIX: verdict dérivé du score final, pas de l'Axe2 seul ── */
+    const finalVerdict = scoreToVerdict(combinedScore);
 
     removeTyping();
     appendBotResult({
-      /* Verdicts */
-      verdict: result2.verdict,
+      verdict: finalVerdict,
       confidence: combinedScore,
       explanation: result2.explanation,
       flags: result2.flags,
-      axe2_score: axe2Score,
+      axe2_score: axe2LLMScore,
       /* Axe 1 */
       authenticity_verdict: result1.authenticity_verdict,
       authenticity_score: axe1Final,

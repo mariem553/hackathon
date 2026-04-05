@@ -6,6 +6,7 @@ Fully offline — no internet required at runtime
 Endpoints:
   POST /predict   → TF-IDF + LogReg fake/AI text detection
   POST /features  → Heuristic feature scoring for source credibility
+  POST /ela       → Error Level Analysis image forensics
   GET  /health    → Health check
 """
 
@@ -16,11 +17,10 @@ import numpy as np
 import re
 import base64
 import io
-from PIL import Image
+from PIL import Image, ImageFilter
 
 app = Flask(__name__)
 
-# Allow CORS from Node.js server
 @app.after_request
 def add_cors(response):
     response.headers["Access-Control-Allow-Origin"]  = "*"
@@ -30,6 +30,7 @@ def add_cors(response):
 
 @app.route("/predict", methods=["OPTIONS"])
 @app.route("/features", methods=["OPTIONS"])
+@app.route("/ela", methods=["OPTIONS"])
 def options():
     return "", 204
 
@@ -128,7 +129,7 @@ REAL_TEXTS = [
 print("[ML] Training TF-IDF + Logistic Regression...")
 
 ALL_TEXTS  = FAKE_TEXTS + REAL_TEXTS
-ALL_LABELS = [1] * len(FAKE_TEXTS) + [0] * len(REAL_TEXTS)   # 1=fake, 0=real
+ALL_LABELS = [1] * len(FAKE_TEXTS) + [0] * len(REAL_TEXTS)
 
 vectorizer = TfidfVectorizer(
     max_features=8000,
@@ -223,7 +224,6 @@ def lexical_diversity(text):
 
 
 def score_domain(url):
-    """Returns (score 0-100, verdict, flags)."""
     if not url:
         return 50, "unknown", ["no_url_provided"]
 
@@ -260,7 +260,7 @@ def score_domain(url):
     for tld in [".info", ".biz", ".xyz", ".click", ".top", ".club"]:
         if domain.endswith(tld):
             penalty += 15
-            flags.append(f"suspicious_tld")
+            flags.append("suspicious_tld")
             break
 
     score = max(0, min(100, 70 - penalty))
@@ -269,6 +269,102 @@ def score_domain(url):
         flags.append("unverified_domain")
 
     return score, verdict, flags
+
+
+# ══════════════════════════════════════════
+#  ELA HELPERS
+# ══════════════════════════════════════════
+
+def decode_image(b64_str):
+    """Decode base64 string (with or without data: prefix) to PIL Image."""
+    # Strip data:image/...;base64, prefix if present
+    if "," in b64_str:
+        b64_str = b64_str.split(",", 1)[1]
+    img_bytes = base64.b64decode(b64_str)
+    return Image.open(io.BytesIO(img_bytes)).convert("RGB")
+
+
+def ela_analysis(img, quality=92):
+    """
+    True ELA: save at quality Q, reload, compute pixel diff amplified ×10.
+    Returns (diff_array, manipulation_score 0-100).
+    
+    FIX vs old version:
+    - Use quality=92 (not 90) — closer to typical camera JPEG quality
+    - Amplify diff ×10 so it's visible on screen
+    - Use per-channel max instead of mean → catches localized edits
+    - Normalize heatmap to its own max, not a fixed scale
+    """
+    width, height = img.size
+
+    # Save at slightly lower quality → untouched areas compress similarly,
+    # edited areas (re-saved at different quality before) stand out
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=quality)
+    buf.seek(0)
+    recompressed = Image.open(buf).convert("RGB")
+
+    orig = np.array(img, dtype=np.float32)
+    recomp = np.array(recompressed, dtype=np.float32)
+
+    # Absolute diff per channel, amplified ×10 to make it visible
+    diff_rgb = np.abs(orig - recomp) * 10.0
+    diff_rgb = np.clip(diff_rgb, 0, 255)
+
+    # Use max across channels — edited regions often spike in one channel
+    diff_max = diff_rgb.max(axis=2)
+
+    # Stats for manipulation scoring
+    mean_diff = diff_max.mean()
+    std_diff  = diff_max.std()
+    p95       = np.percentile(diff_max, 95)
+
+    # High mean + high std + high p95 = likely manipulation
+    # Typical unmanipulated JPEG: mean_diff < 5, std < 8, p95 < 20
+    # Manipulated regions: localized spikes pushing p95 up
+    norm_mean = min(1.0, mean_diff / 30.0)
+    norm_std  = min(1.0, std_diff  / 25.0)
+    norm_p95  = min(1.0, p95       / 80.0)
+
+    manipulation_prob = (norm_mean * 0.3 + norm_std * 0.3 + norm_p95 * 0.4)
+    manipulation_prob = round(float(np.clip(manipulation_prob, 0.0, 1.0)), 3)
+
+    return diff_max, manipulation_prob
+
+
+def build_heatmap(diff_array, size):
+    """
+    Convert diff array to a visible RGB heatmap.
+    Uses a green→yellow→red colormap instead of grayscale
+    so suspicious zones are obvious at a glance.
+    """
+    h, w = diff_array.shape
+
+    # Normalize to 0-255
+    d_max = diff_array.max()
+    if d_max < 1e-6:
+        normalized = np.zeros_like(diff_array, dtype=np.uint8)
+    else:
+        normalized = (diff_array / d_max * 255).astype(np.uint8)
+
+    # Build RGB colormap: low=dark blue, mid=yellow, high=red
+    r = np.clip(normalized.astype(np.float32) * 2 - 255, 0, 255).astype(np.uint8)
+    g = np.clip(255 - np.abs(normalized.astype(np.float32) - 128) * 2, 0, 255).astype(np.uint8)
+    b = np.clip(255 - normalized.astype(np.float32) * 2, 0, 255).astype(np.uint8)
+
+    rgb = np.stack([r, g, b], axis=2)
+    heatmap = Image.fromarray(rgb, mode="RGB")
+
+    # Resize to match original if needed
+    if heatmap.size != size:
+        heatmap = heatmap.resize(size, Image.LANCZOS)
+
+    # Light smoothing for readability
+    heatmap = heatmap.filter(ImageFilter.GaussianBlur(radius=1))
+
+    buf = io.BytesIO()
+    heatmap.save(buf, format="PNG")
+    return base64.b64encode(buf.getvalue()).decode("utf-8")
 
 
 # ══════════════════════════════════════════
@@ -287,21 +383,6 @@ def health():
 
 @app.route("/predict", methods=["POST"])
 def predict():
-    """
-    Input : { "text": "..." }
-    Output: {
-      "fake_probability" : 0.0-1.0,
-      "real_probability" : 0.0-1.0,
-      "ml_verdict"       : "fake" | "real" | "uncertain",
-      "ml_score"         : 0-100,   # 100 = authentic, 0 = fake
-      "confidence_label" : "high" | "medium" | "low",
-      "clickbait_count"  : int,
-      "caps_ratio"       : float,
-      "avg_sentence_length": float,
-      "lexical_diversity": float,
-      "flags"            : [...]
-    }
-    """
     data = request.get_json(silent=True)
     if not data or not data.get("text"):
         return jsonify({"error": "Missing 'text' field"}), 400
@@ -310,31 +391,28 @@ def predict():
     if len(text) < 5:
         return jsonify({"error": "Text too short (min 5 chars)"}), 400
 
-    # ── TF-IDF prediction ──
     X        = vectorizer.transform([text])
     proba    = classifier.predict_proba(X)[0]
     fake_prob = float(proba[1])
     real_prob = float(proba[0])
-    ml_score  = round(real_prob * 100)   # 100 = authentic
+    ml_score  = round(real_prob * 100)
 
     if real_prob >= 0.65:
-        ml_verdict        = "real"
-        confidence_label  = "high" if real_prob >= 0.80 else "medium"
+        ml_verdict       = "real"
+        confidence_label = "high" if real_prob >= 0.80 else "medium"
     elif fake_prob >= 0.65:
-        ml_verdict        = "fake"
-        confidence_label  = "high" if fake_prob >= 0.80 else "medium"
+        ml_verdict       = "fake"
+        confidence_label = "high" if fake_prob >= 0.80 else "medium"
     else:
-        ml_verdict        = "uncertain"
-        confidence_label  = "low"
+        ml_verdict       = "uncertain"
+        confidence_label = "low"
 
-    # ── Linguistic features ──
     cb_count = count_clickbait(text)
     cap      = round(caps_ratio(text), 3)
     exc      = round(exclamation_density(text), 3)
     avg_sl   = round(avg_sentence_length(text), 1)
     lex_div  = round(lexical_diversity(text), 3)
 
-    # ── Build flags ──
     flags = []
     if cb_count >= 2:
         flags.append(f"clickbait_language ({cb_count} signals)")
@@ -365,17 +443,6 @@ def predict():
 
 @app.route("/features", methods=["POST"])
 def features():
-    """
-    Source credibility heuristic scoring.
-    Input : { "url": "...", "text": "..." }
-    Output: {
-      "source_score"   : 0-100,
-      "source_verdict" : "trusted" | "suspicious" | "unknown",
-      "domain"         : "...",
-      "has_https"      : bool,
-      "combined_flags" : [...]
-    }
-    """
     data = request.get_json(silent=True)
     if not data:
         return jsonify({"error": "No JSON body"}), 400
@@ -385,7 +452,7 @@ def features():
 
     dom_score, dom_verdict, dom_flags = score_domain(url)
 
-    text_flags  = []
+    text_flags   = []
     text_penalty = 0
 
     if text:
@@ -423,104 +490,73 @@ def features():
 @app.route("/ela", methods=["POST", "OPTIONS"])
 def ela():
     """
-    Error Level Analysis (ELA) for image forensics via JPEG recompression.
-    Detects manipulation signs in images through quality/compression artifacts.
-    
-    Input : { 
-      "image_base64": "data:image/jpeg;base64,...",
-      "media_type": "image/jpeg"
-    }
-    Output: {
-      "ela_score": 0-100,              # 100 = highly manipulated, 0 = authentic
-      "manipulation_probability": 0-1.0,
-      "heatmap_base64": "data:image/png;base64,...",
-      "analysis": "description",
-      "flags": [...]
-    }
+    Error Level Analysis (ELA) for image forensics.
+
+    Input : { "image_base64": "data:image/jpeg;base64,..." OR raw base64,
+              "media_type": "image/jpeg" }
+    Output: { "ela_score": 0-100,
+              "manipulation_probability": 0.0-1.0,
+              "heatmap_base64": "data:image/png;base64,...",
+              "analysis": "...",
+              "flags": [...] }
     """
     if request.method == "OPTIONS":
         return "", 204
-    
+
     data = request.get_json(silent=True)
     if not data or not data.get("image_base64"):
         return jsonify({"error": "Missing 'image_base64' field"}), 400
-    
-    # ── Decode base64 image ──
+
     try:
-        b64_str = data.get("image_base64", "").split(",")[-1]  # Strip data: prefix
-        img_data = base64.b64decode(b64_str)
-        img = Image.open(io.BytesIO(img_data)).convert("RGB")
+        img = decode_image(data["image_base64"])
     except Exception as e:
         return jsonify({"error": f"Invalid image data: {str(e)}"}), 400
-    
-    # ── ELA Analysis: JPEG recompression residuals ──
-    width, height = img.size
-    
-    # Re-encode at 90% quality to detect manipulation
-    ela_buff = io.BytesIO()
-    img.save(ela_buff, format="JPEG", quality=90)
-    ela_img = Image.open(io.BytesIO(ela_buff.getvalue())).convert("RGB")
-    
-    # Compute pixel-wise difference (absolute error)
-    orig_arr = np.array(img, dtype=np.float32)
-    ela_arr  = np.array(ela_img, dtype=np.float32)
-    
-    diff = np.abs(orig_arr - ela_arr).mean(axis=2)  # Average across RGB
-    
-    # ── Manipulation probability from residual distribution ──
-    mean_diff  = diff.mean()
-    std_diff   = diff.std()
-    max_diff   = diff.max()
-    
-    # Heuristic: High residuals in localized regions suggest splicing/editing
-    threshold = mean_diff + std_diff * 1.5
-    suspicious_pixels = (diff > threshold).sum()
-    pixel_ratio = suspicious_pixels / (width * height)
-    
-    # Combine metrics for manipulation probability
-    # High variance + high pixel ratio = likely manipulation
-    manipulation_prob = min(1.0, max(0.0, 
-        (pixel_ratio * 0.6 + (std_diff / 50.0) * 0.4)
-    ))
-    
+
+    try:
+        diff_array, manipulation_prob = ela_analysis(img, quality=92)
+        heatmap_b64 = build_heatmap(diff_array, img.size)
+    except Exception as e:
+        return jsonify({"error": f"ELA processing failed: {str(e)}"}), 500
+
     ela_score = round(manipulation_prob * 100)
-    
-    # ── Generate ELA heatmap (visualization) ──
-    # Normalize differences to 0-255 for visualization
-    heatmap_data = (diff / (max_diff + 1e-6) * 255).astype(np.uint8)
-    heatmap_img = Image.fromarray(heatmap_data, mode="L").resize((width, height))
-    
-    # Convert heatmap to base64
-    hm_buff = io.BytesIO()
-    heatmap_img.save(hm_buff, format="PNG")
-    heatmap_b64 = base64.b64encode(hm_buff.getvalue()).decode("utf-8")
-    
-    # ── Build analysis report ──
-    flags = []
-    analysis = ""
-    
+    flags     = []
+    analysis  = ""
+
     if manipulation_prob > 0.6:
         flags.append("possible_image_manipulation")
-        analysis = "Detected significant error level anomalies suggesting potential image editing or splicing."
-    elif manipulation_prob > 0.4:
+        analysis = (
+            "Significant error level anomalies detected. "
+            "Suspicious zones (red/yellow in heatmap) suggest splicing or local editing."
+        )
+    elif manipulation_prob > 0.35:
         flags.append("suspicious_error_patterns")
-        analysis = "Moderate error level inconsistencies detected. May indicate minor editing or compression artifacts."
+        analysis = (
+            "Moderate error level inconsistencies. "
+            "Could indicate minor retouching or multiple JPEG re-saves."
+        )
     else:
         flags.append("error_levels_consistent")
-        analysis = "Error levels consistent with unmanipulated JPEG compression. Likely authentic image."
-    
-    if pixel_ratio > 0.15:
-        flags.append("wide_region_anomaly")
-    
-    if max_diff > 100:
+        analysis = (
+            "Error levels consistent with unmanipulated JPEG compression. "
+            "Likely authentic image."
+        )
+
+    # Extra flags based on raw stats
+    p95 = float(np.percentile(diff_array, 95))
+    if p95 > 60:
         flags.append("extreme_pixel_differences")
-    
+
+    suspicious_pixels = int((diff_array > diff_array.mean() + diff_array.std() * 2).sum())
+    pixel_ratio = suspicious_pixels / max(diff_array.size, 1)
+    if pixel_ratio > 0.08:
+        flags.append("wide_region_anomaly")
+
     return jsonify({
-        "ela_score": ela_score,
-        "manipulation_probability": round(manipulation_prob, 3),
-        "heatmap_base64": f"data:image/png;base64,{heatmap_b64}",
-        "analysis": analysis,
-        "flags": flags,
+        "ela_score":              ela_score,
+        "manipulation_probability": manipulation_prob,
+        "heatmap_base64":         f"data:image/png;base64,{heatmap_b64}",
+        "analysis":               analysis,
+        "flags":                  flags,
     })
 
 
