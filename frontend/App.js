@@ -57,7 +57,7 @@ function detectLanguage(text) {
   const arabicPattern = /[\u0600-\u06FF]/;
   const frenchPattern = /[éèêëàâçîïôûùüÿœ]/i;
   const tunisianMarkers =
-    /(zaama|sahha|mouch|barcha|chnowa|andek|mtaa|hatha|hethi)/i;
+    /(zaama|shih|mouch|barcha|chnowa|andek|mtaa|hatha|hethi|wallah)/i;
 
   if (tunisianMarkers.test(text)) return "tun";
   if (arabicPattern.test(text)) return "ar";
@@ -278,6 +278,35 @@ function appendBotResult(data) {
     : "";
 
   const uid = Date.now();
+  // Build feature scoring HTML
+const features = data.features || {};
+const featureLabels = {
+  factual_plausibility: "Plausibilité factuelle",
+  sensationalism:       "Sensationnalisme",
+  detail_precision:     "Précision des détails",
+  internal_coherence:   "Cohérence interne",
+  disinfo_pattern:      "Pattern désinformation",
+};
+const featureRowsHtml = Object.entries(featureLabels).map(([key, label]) => {
+  const score = features[key]?.score ?? 0;
+  const reason = features[key]?.reason ?? "";
+  const color = score >= 70
+    ? "var(--verified)"
+    : score >= 40
+    ? "var(--suspicious)"
+    : "var(--misleading)";
+  return `
+    <div class="feature-row">
+      <div class="feature-row-top">
+        <span class="feature-label">${label}</span>
+        <span class="feature-score">${score}/100</span>
+      </div>
+      <div class="score-bar-wrap">
+        <div class="score-bar" style="width:${score}%; background:${color};"></div>
+      </div>
+      <span class="feature-reason">${escapeHtml(reason)}</span>
+    </div>`;
+}).join("");
 
   msg.innerHTML = `
     <div class="bot-avatar">${BOT_AVATAR_SVG}</div>
@@ -290,7 +319,22 @@ function appendBotResult(data) {
       <div class="score-bar-wrap">
         <div class="score-bar" id="bar-main-${uid}" data-score="${confidence}"></div>
       </div>
-      <p class="result-expl">${escapeHtml(data.explanation || "—")}</p>
+      <!-- Réponse Katous en tunisien -->
+${data.katous_reply ? `
+<div class="katous-reply">
+  <span class="katous-icon">${BOT_AVATAR_SVG}</span>
+  <p>${escapeHtml(data.katous_reply)}</p>
+</div>` : ""}
+
+<p class="result-expl">${escapeHtml(data.explanation || "—")}</p>
+
+<!-- Feature Scoring -->
+<details class="feature-details" open>
+  <summary>🔬 Voir l'analyse détaillée (Feature Scoring)</summary>
+  <div class="feature-scoring-block">
+    ${featureRowsHtml}
+  </div>
+</details>
 
       ${flagsHtml}
 
@@ -404,15 +448,59 @@ Respond ONLY with a valid JSON object, no preamble, no markdown:
   "authenticity_flags": ["<short flag>"]
 }`;
 
-const SYSTEM_AXE2 = `You are an expert fact-checker and contextual consistency analyst.
-Analyze whether the content is contextually accurate, potentially misleading, or verifiably false.
-Respond ONLY with a valid JSON object, no preamble, no markdown:
+const SYSTEM_AXE2 = `You are an expert fact-checker using Feature Scoring methodology.
+
+Analyze the content and score EACH feature independently on 0-100:
+
+FEATURE 1 - FACTUAL_PLAUSIBILITY
+→ Is the claim factually possible based on known reality?
+→ 0 = clearly impossible/false, 100 = well-established fact
+
+FEATURE 2 - SENSATIONALISM  
+→ Is the language exaggerated, emotionally charged, clickbait?
+→ 0 = extremely sensationalist (red flag), 100 = neutral/factual tone
+
+FEATURE 3 - DETAIL_PRECISION
+→ Are there verifiable specifics (dates, names, numbers, locations)?
+→ 0 = completely vague, 100 = rich verifiable details
+
+FEATURE 4 - INTERNAL_COHERENCE
+→ Does the claim contradict itself? Do all elements align?
+→ 0 = contradictions detected, 100 = perfectly coherent
+
+FEATURE 5 - DISINFO_PATTERN
+→ Does it match known misinformation patterns (recycled content, out-of-context, conspiracy framing)?
+→ 0 = classic disinfo pattern, 100 = no suspicious pattern
+
+Respond ONLY with valid JSON, no preamble, no markdown:
 {
+  "features": {
+    "factual_plausibility":  { "score": <0-100>, "reason": "<one sentence>" },
+    "sensationalism":        { "score": <0-100>, "reason": "<one sentence>" },
+    "detail_precision":      { "score": <0-100>, "reason": "<one sentence>" },
+    "internal_coherence":    { "score": <0-100>, "reason": "<one sentence>" },
+    "disinfo_pattern":       { "score": <0-100>, "reason": "<one sentence>" }
+  },
   "verdict": "verified" | "suspicious" | "misleading",
-  "confidence": <integer 0-100>,
-  "explanation": "<2-4 sentence analysis>",
+  "confidence": <weighted average 0-100>,
+  "explanation": "<2-3 sentence global analysis>",
   "flags": ["<short flag>"]
 }`;
+
+const SYSTEM_TUNISIAN_RESPONSE = `You are "Katous", a funny and sharp Tunisian fact-checker chatbot.
+You speak in authentic Tunisian dialect (Derja).
+Given a JSON analysis result, write a SHORT conversational response in Tunisian dialect.
+
+Rules:
+- 2-3 sentences max
+- Natural Tunisian dialect (mix Arabic/French like Tunisians actually speak)
+- Use "zaama", "bro", "barcha", "mriguel", "sahha", "mouch sahha", "mtekkd" naturally
+- Match the verdict: serious if misleading, reassuring if verified, cautious if suspicious
+- Do NOT repeat all the scores — just give the vibe in a human way
+- End with a short emoji
+
+Respond ONLY with a plain text string (no JSON, no markdown).`;
+
 
 const SYSTEM_AXE3 = `You are an expert in source credibility analysis.
 Analyze the source URL for trustworthiness. Look for suspicious domains, clickbait patterns, spoofed sites, new domains.
@@ -436,7 +524,11 @@ async function callAPI(systemPrompt, userContent) {
   if (!res.ok) throw new Error("Erreur serveur " + res.status);
   const data = await res.json();
   const raw = (data.result || "{}").replace(/```json|```/gi, "").trim();
-  return JSON.parse(raw);
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return raw; // plain text (e.g. Katous response)
+  }
 }
 
 /* ══════════════════════════════════════════
@@ -597,27 +689,68 @@ async function sendMessage() {
     ]);
 
     // Step 5: Combined score
-    const combinedScore = Math.round(
-      (result1.authenticity_score ?? 50) * 0.2 +
-        (result2.confidence ?? 50) * 0.5 +
-        (result3.source_score ?? 50) * 0.3,
-    );
+    // Step 5: Feature Scoring — weighted average from Axe2 features
+const f = result2.features || {};
+const featureWeights = {
+  factual_plausibility: 0.35,
+  sensationalism:       0.15,
+  detail_precision:     0.20,
+  internal_coherence:   0.15,
+  disinfo_pattern:      0.15,
+};
+const axe2WeightedScore = Object.entries(featureWeights).reduce(
+  (acc, [key, weight]) => acc + (f[key]?.score ?? 50) * weight,
+  0
+);
+
+const combinedScore = Math.round(
+  (result1.authenticity_score ?? 50) * 0.20 +
+  axe2WeightedScore                  * 0.50 +
+  (result3.source_score ?? 50)       * 0.30,
+);
+
+// Generate Tunisian response from combined result
+const summaryForKatous = `
+Verdict: ${result2.verdict}, confidence: ${combinedScore}%
+Factual plausibility: ${f.factual_plausibility?.score ?? "?"}
+Sensationalism: ${f.sensationalism?.score ?? "?"}
+Detail precision: ${f.detail_precision?.score ?? "?"}
+Internal coherence: ${f.internal_coherence?.score ?? "?"}
+Disinfo pattern: ${f.disinfo_pattern?.score ?? "?"}
+Source verdict: ${result3.source_verdict}
+Explanation: ${result2.explanation}
+`;
+
+let katousReply = "";
+try {
+  const katousRes = await callAPI(SYSTEM_TUNISIAN_RESPONSE, [
+    { type: "text", text: summaryForKatous }
+  ]);
+  // callAPI tries to JSON.parse — Katous returns plain text so we handle it
+  katousReply = typeof katousRes === "string"
+    ? katousRes
+    : katousRes?.message || katousRes?.reply || result2.explanation;
+} catch {
+  katousReply = result2.explanation; // fallback
+}
 
     removeTyping();
     appendBotResult({
-      authenticity_verdict: result1.authenticity_verdict,
-      authenticity_score: result1.authenticity_score,
-      authenticity_explanation: result1.authenticity_explanation,
-      authenticity_flags: result1.authenticity_flags,
-      verdict: result2.verdict,
-      confidence: combinedScore,
-      explanation: result2.explanation,
-      flags: result2.flags,
-      source_verdict: result3.source_verdict,
-      source_score: result3.source_score,
-      source_explanation: result3.source_explanation,
-      source_flags: result3.source_flags,
-    });
+  authenticity_verdict: result1.authenticity_verdict,
+  authenticity_score: result1.authenticity_score,
+  authenticity_explanation: result1.authenticity_explanation,
+  authenticity_flags: result1.authenticity_flags,
+  verdict: result2.verdict,
+  confidence: combinedScore,
+  explanation: result2.explanation,
+  flags: result2.flags,
+  features: result2.features,        // ← AJOUTE ÇA
+  katous_reply: katousReply,          // ← AJOUTE ÇA
+  source_verdict: result3.source_verdict,
+  source_score: result3.source_score,
+  source_explanation: result3.source_explanation,
+  source_flags: result3.source_flags,
+});
   } catch (err) {
     removeTyping();
     appendBotError(err.message);

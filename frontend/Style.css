@@ -301,3 +301,72 @@ main {
   .msg-bubble { max-width: 90%; font-size: 13px; }
   .result-bubble { max-width: 96%; }
 }
+
+/* ── Katous reply bubble ── */
+.katous-reply {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: rgba(212, 168, 255, 0.08);
+  border: 1px solid rgba(212, 168, 255, 0.2);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  font-style: italic;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.katous-reply .bot-avatar {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
+/* ── Feature Scoring ── */
+.feature-details {
+  margin-top: 12px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.feature-details summary {
+  padding: 10px 14px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  color: var(--suspicious);
+  user-select: none;
+  list-style: none;
+}
+.feature-details summary:hover { opacity: 0.8; }
+.feature-scoring-block {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.feature-row {}
+.feature-row-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.feature-label {
+  font-size: 0.72rem;
+  color: rgba(255,255,255,0.7);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.feature-score {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: white;
+}
+.feature-reason {
+  font-size: 0.7rem;
+  color: rgba(255,255,255,0.45);
+  display: block;
+  margin-top: 4px;
+  line-height: 1.4;
+}
