@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>قطوس في شكارة — زعما صحيحة؟</title>
+  <link rel="stylesheet" href="Style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <div class="bg-grid"></div>
+  <div class="bg-glow"></div>
+
+  <header>
+    <a class="logo" href="#">
+      <svg class="logo-mark" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M8 17 Q8 13 12 13 L28 13 Q32 13 32 17 L30 34 Q30 36 28 36 L12 36 Q10 36 10 34 Z" fill="#1a1a28" stroke="#d4a8ff" stroke-width="1.2"/>
+        <path d="M14 13 Q20 9 26 13" stroke="#d4a8ff" stroke-width="1.2" stroke-linecap="round" fill="none"/>
+        <ellipse cx="20" cy="13" rx="6" ry="5" fill="#d4a8ff"/>
+        <path d="M15 10 L14 6 L18 9 Z" fill="#d4a8ff"/>
+        <path d="M25 10 L26 6 L22 9 Z" fill="#d4a8ff"/>
+        <path d="M15.5 9.5 L14.8 7.2 L17.2 9 Z" fill="#ff9de2"/>
+        <path d="M24.5 9.5 L25.2 7.2 L22.8 9 Z" fill="#ff9de2"/>
+        <ellipse cx="17.5" cy="13" rx="1.5" ry="1.8" fill="#0a0a0d"/>
+        <ellipse cx="22.5" cy="13" rx="1.5" ry="1.8" fill="#0a0a0d"/>
+        <circle cx="18" cy="12.3" r="0.5" fill="white"/>
+        <circle cx="23" cy="12.3" r="0.5" fill="white"/>
+        <path d="M19.5 15 L20 15.5 L20.5 15 L20 14.5 Z" fill="#ff9de2"/>
+        <path d="M13 23 Q11 22 12 20 Q14 19 15 21 Q16 19 18 20 Q18 22 16 23 Z" fill="#d4a8ff" opacity="0.7"/>
+      </svg>
+      <div class="logo-text-wrap">
+        <span class="logo-arabic">قطوس في شكارة</span>
+        <span class="logo-latin">AI VERIFICATION · 3 AXES</span>
+      </div>
+    </a>
+    <div class="header-tag">زعما صحيحة؟</div>
+  </header>
+
+  <main>
+    <div class="chat-window" id="chatWindow">
+
+      <!-- FIRST MESSAGE: TUNISIAN ONLY - CAPTIVATING -->
+      <div class="chat-msg bot">
+        <div class="bot-avatar">
+          <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M8 17 Q8 13 12 13 L28 13 Q32 13 32 17 L30 34 Q30 36 28 36 L12 36 Q10 36 10 34 Z" fill="#1a1a28" stroke="#d4a8ff" stroke-width="1.2"/>
+            <path d="M14 13 Q20 9 26 13" stroke="#d4a8ff" stroke-width="1.2" stroke-linecap="round" fill="none"/>
+            <ellipse cx="20" cy="13" rx="6" ry="5" fill="#d4a8ff"/>
+            <path d="M15 10 L14 6 L18 9 Z" fill="#d4a8ff"/>
+            <path d="M25 10 L26 6 L22 9 Z" fill="#d4a8ff"/>
+            <path d="M15.5 9.5 L14.8 7.2 L17.2 9 Z" fill="#ff9de2"/>
+            <path d="M24.5 9.5 L25.2 7.2 L22.8 9 Z" fill="#ff9de2"/>
+            <ellipse cx="17.5" cy="13" rx="1.5" ry="1.8" fill="#0a0a0d"/>
+            <ellipse cx="22.5" cy="13" rx="1.5" ry="1.8" fill="#0a0a0d"/>
+            <circle cx="18" cy="12.3" r="0.5" fill="white"/>
+            <circle cx="23" cy="12.3" r="0.5" fill="white"/>
+            <path d="M19.5 15 L20 15.5 L20.5 15 L20 14.5 Z" fill="#ff9de2"/>
+            <path d="M13 23 Q11 22 12 20 Q14 19 15 21 Q16 19 18 20 Q18 22 16 23 Z" fill="#d4a8ff" opacity="0.7"/>
+          </svg>
+        </div>
+        <div class="msg-bubble">
+          <p style="font-size: 1.2em; font-family: 'DM Serif Display', serif;">🌟 <strong>زعما صحيحة؟</strong> 🌟</p>
+          <p>🐱 <em>"Zaama shih wala katous fel chkara?"</em>
+          <p>📎 donne moi : <strong>texte, lien, image, vidéo, titre</strong> </p>
+          <p>⚡ 3 axes d'analyse: Authenticité, Consistance, Crédibilité</p>
+          <hr style="border-color: #252530; margin: 10px 0;">
+          <p>👇 <strong>tu peux essayer</strong> Chouf les exemples:</p>
+          <div class="suggestions">
+            <button onclick="loadSuggestion('fake')">🔴 Fake news</button>
+            <button onclick="loadSuggestion('suspicious')">🟡 Source suspecte</button>
+            <button onclick="loadSuggestion('verified')">🟢 Info vraie</button>
+          </div>
+          <p style="font-size: 11px; color: #7070a0; margin-top: 8px;">💡 <em>Après ton premier message, je répondrai dans ta langue (français, anglais, tunisien mixte).</em></p>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- INPUT BAR -->
+    <div class="chat-input-bar">
+      <div id="filePreviewBar" class="file-preview-bar" style="display:none">
+        <img id="filePreviewImg" style="max-width: 40px; max-height: 40px; border-radius: 4px; display: none;">
+        <span id="filePreviewName">—</span>
+        <button onclick="clearFile()">×</button>
+      </div>
+      
+      <div id="attachedItemsBar" class="attached-items-bar" style="display:none">
+        <div id="attachedItemsList" class="attached-items-list"></div>
+      </div>
+      
+      <div id="urlInputRow" class="extra-input-row" style="display:none">
+        <span class="extra-input-label">🔗 URL</span>
+        <input type="url" id="urlInput" placeholder="https://…" />
+        <button class="extra-input-close" onclick="toggleUrlInput()">×</button>
+      </div>
+      
+      <div id="captionInputRow" class="extra-input-row" style="display:none">
+        <span class="extra-input-label">📌 Caption</span>
+        <input type="text" id="captionInput" placeholder="Headline or caption…" />
+        <button class="extra-input-close" onclick="toggleCaptionInput()">×</button>
+      </div>
+      
+      <div class="chat-input-wrap">
+        <textarea
+          id="chatInput"
+          placeholder="Zaama c'est vrai que… / Colle un lien / Pose une question…"
+          rows="1"
+          onkeydown="handleKey(event)"
+          oninput="autoResize(this)"
+        ></textarea>
+        
+        <div class="input-controls">
+          <label class="attach-btn" title="Joindre une image ou vidéo">
+            <input type="file" accept="image/*,video/*" id="fileInput" onchange="handleFile(event)" hidden multiple>
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4">
+              <path d="M16 9.5l-6 6a4.5 4.5 0 01-6.36-6.36l6-6a3 3 0 014.24 4.24l-6 6a1.5 1.5 0 01-2.12-2.12l5.5-5.5"/>
+            </svg>
+          </label>
+          
+          <button class="input-toggle-btn" id="urlToggleBtn" onclick="toggleUrlInput()" title="Ajouter URL">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4">
+              <path d="M3 9h12M9 3v12M10.5 5c2 0 3.5 1.5 3.5 3.5s-1.5 3.5-3.5 3.5H7.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          
+          <button class="input-toggle-btn" id="captionToggleBtn" onclick="toggleCaptionInput()" title="Ajouter titre/caption">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4">
+              <path d="M3 3h12v12H3V3M6 7h6M6 11h4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+        
+        <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M15 9H3M9 3l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </div>
+      
+      <p class="input-hint">Entrée pour envoyer · Shift+Entrée pour nouvelle ligne</p>
+    </div>
+  </main>
+
+  <script src="App.js"></script>
+</body>
+</html>
